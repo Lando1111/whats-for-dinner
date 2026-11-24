@@ -30,7 +30,7 @@ export function SignIn({ say, invited }) {
     <main class="main no-tabs" style="justify-content:center;gap:24px">
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
         <img src={`${import.meta.env.BASE_URL}icons/pizza-mark.svg`} alt="" width="96" height="96" />
-        <h1 class="display">What's for dinner?</h1>
+        <h1 class="display">What's for Dinner?</h1>
         <p class="cap" style="font-size:15px;line-height:22px;margin:0">
           {invited ? "You've been invited to join a household. Sign in to accept." : 'Plan the week, keep your recipes and share the shopping list.'}
         </p>

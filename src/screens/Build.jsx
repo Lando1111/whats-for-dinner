@@ -41,7 +41,7 @@ export function Build({ start, household, say, userId }) {
         </p>
       )}
       {!plan || !recipes ? <p class="cap">Loading…</p> : sources.length === 0 ? (
-        <div class="empty"><p style="margin:0;font-weight:700">Nothing to build from</p><p class="cap" style="margin:0">Plan some dinners or extras for this week first.</p><a class="btn" href="#/week">Back to the week</a></div>
+        <div class="empty"><p style="margin:0;font-weight:700">Nothing to build from</p><p class="cap" style="margin:0">Plan some dinners or bake &amp; prep for this week first.</p><a class="btn" href="#/week">Back to the week</a></div>
       ) : (
         <ShopChecklist sources={sources} household={household} userId={userId} say={say} onDone={() => go('shopping')} />
       )}

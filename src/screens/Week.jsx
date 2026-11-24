@@ -81,7 +81,7 @@ export function Week({ household, member, say }) {
     <main class="main">
       <header class="row-head">
         <img src={`${import.meta.env.BASE_URL}icons/pizza-mark.svg`} alt="" width="36" height="36" />
-        <h1 class="title">What's for dinner?</h1>
+        <h1 class="title">What's for Dinner?</h1>
       </header>
       <div class="row-head" style="gap:4px">
         <button class="icon-btn" aria-label="Previous week" onClick={() => setOffset(offset - 1)}><Icon name="back" /></button>
@@ -158,8 +158,8 @@ export function Week({ household, member, say }) {
 
       {pickingExtra && (
         <div class="scrim">
-          <section class="sheet full" role="dialog" aria-label="Pick an extra">
-            <Recipes pick startFilter="extras" title={`Add to ${EXTRAS_NAME.toLowerCase()}`} onPick={(r) => { setPickingExtra(false); if (r) extraRun(() => addExtra(household.id, dates[0], r.id)); }} />
+          <section class="sheet full" role="dialog" aria-label="Pick for bake and prep">
+            <Recipes pick startFilter="extras" title={`Add to ${EXTRAS_NAME}`} onPick={(r) => { setPickingExtra(false); if (r) extraRun(() => addExtra(household.id, dates[0], r.id)); }} />
           </section>
         </div>
       )}

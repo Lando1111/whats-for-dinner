@@ -50,10 +50,10 @@ export function Household({ member, household, reload, say, userId }) {
     const { data: token, error } = await supabase.rpc('create_invite', { p_role: inviteRole });
     if (error) return say(friendly(error), true);
     const url = `${APP_URL}#/join/${token}`;
-    const text = `Join ${household.name} on What's for dinner?`;
+    const text = `Join ${household.name} on What's for Dinner?`;
     load();
     try {
-      if (navigator.share) { await navigator.share({ title: "What's for dinner?", text, url }); return; }
+      if (navigator.share) { await navigator.share({ title: "What's for Dinner?", text, url }); return; }
     } catch (e) { if (e?.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(url); say('Invite link copied. Paste it into a message.'); } catch { setShareLink(url); }
   }

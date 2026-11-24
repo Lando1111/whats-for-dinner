@@ -1,4 +1,4 @@
-# What's for dinner?
+# What's for Dinner?
 
 A household meal planner for Android (installable web app). Plan the week's dinners, keep the family's recipes, and share one live shopping list between phones.
 

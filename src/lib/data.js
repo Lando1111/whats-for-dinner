@@ -145,7 +145,7 @@ export const MEAL_TYPES = [['dinner', 'Dinner'], ['baking', 'Baking'], ['breakfa
 export const MEAL_TYPE_LABEL = Object.fromEntries(MEAL_TYPES);
 export const isDinner = (r) => !r.meal_type || r.meal_type === 'dinner';
 // What the weekly non-dinner list is called in the app. Change here to rename it everywhere.
-export const EXTRAS_NAME = 'Extras this week';
+export const EXTRAS_NAME = 'Bake & prep';
 export function seasonNow(d = new Date()) {
   const m = d.getMonth(); // southern hemisphere
   return m === 11 || m <= 1 ? 'summer' : m <= 4 ? 'autumn' : m <= 7 ? 'winter' : 'spring';

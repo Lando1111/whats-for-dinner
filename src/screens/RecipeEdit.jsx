@@ -203,7 +203,7 @@ function Form({ existing, household, say }) {
           <div class="chips">
             {MEAL_TYPES.map(([v, l]) => <button type="button" class="chipbtn" aria-pressed={r.meal_type === v ? 'true' : 'false'} onClick={() => set('meal_type', v)}>{l}</button>)}
           </div>
-          <span class="cap">Only dinners are used by Fill the week. The rest can go in {EXTRAS_NAME.toLowerCase()}.</span>
+          <span class="cap">Only dinners are used by Fill the week. The rest go in {EXTRAS_NAME}.</span>
           <h2 class="lbl" style="margin:8px 0 0">Protein</h2>
           <div class="chips">
             {PROTEINS.map(([v, l]) => <button type="button" class="chipbtn sage" aria-pressed={r.protein === v ? 'true' : 'false'} onClick={() => set('protein', r.protein === v ? null : v)}>{l}</button>)}

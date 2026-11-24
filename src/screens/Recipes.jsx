@@ -5,7 +5,7 @@ import { Icon } from '../icons.jsx';
 const FILTERS = [
   ['all', 'All'],
   ['dinner', 'Dinners'],
-  ['extras', 'Baking & extras'],
+  ['extras', 'Bake & prep'],
   ['season', 'In season'],
   ['vegetarian', 'Vegetarian'],
   ['easy', 'Easy / fun'],

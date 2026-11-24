@@ -111,7 +111,7 @@ export function Recipe({ id, household, canEdit, say, userId }) {
       {canEdit && (
         <div class="footer-bar">
           <a class="icon-btn" href={`#/recipe/${recipe.id}/edit`} aria-label="Edit recipe" style="border:2px solid var(--ls);width:52px;height:52px"><Icon name="edit" /></a>
-          <button class="btn" style="flex:1" onClick={() => setPlanning(true)}><Icon name="week" />{isDinner(recipe) ? 'Add to the week' : `Add to ${EXTRAS_NAME.toLowerCase()}`}</button>
+          <button class="btn" style="flex:1" onClick={() => setPlanning(true)}><Icon name="week" />{isDinner(recipe) ? 'Add to the week' : `Add to ${EXTRAS_NAME}`}</button>
         </div>
       )}
       {planning && <PlanSheet recipe={recipe} household={household} doubled={doubled} say={say} onClose={() => setPlanning(false)} />}
@@ -143,7 +143,7 @@ function PlanSheet({ recipe, household, doubled, say, onClose }) {
     const monday = mondayOf(); monday.setDate(monday.getDate() + weeksAhead * 7);
     try {
       await addExtra(household.id, isoDate(monday), recipe.id, doubled ? 2 : 1);
-      say(`${recipe.title} added to ${weeksAhead ? "next week's" : "this week's"} extras`);
+      say(`${recipe.title} added to ${weeksAhead ? "next week's" : "this week's"} bake & prep`);
       onClose();
       go(weeksAhead ? 'week' : 'week');
     } catch (e) { say(friendly(e), true); }
@@ -151,7 +151,7 @@ function PlanSheet({ recipe, household, doubled, say, onClose }) {
 
   const extrasBlock = (
     <div class="card" style="padding:12px;display:flex;flex-direction:column;gap:8px">
-      <span style="font-weight:700">As an extra</span>
+      <span style="font-weight:700">Bake &amp; prep</span>
       <span class="cap">For baking, overnight oats and other non-dinners. Doesn't use a dinner night; its ingredients go into Build list.</span>
       <div class="grid2" style="gap:8px">
         <button class="btn outline" style="height:44px;font-size:14px" onClick={() => addAsExtra(0)}>This week</button>

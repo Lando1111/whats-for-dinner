@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*'],
       manifest: {
-        name: "What's for dinner?",
-        short_name: 'Dinner',
+        name: "What's for Dinner?",
+        short_name: 'WFD',
         description: 'Plan the week, keep your recipes and share the shopping list.',
         lang: 'en-AU',
         start_url: base,

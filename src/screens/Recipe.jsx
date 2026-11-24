@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useRecipes, usePhotoUrls, setRecipePhoto, seasonsText, PROTEIN_LABEL, MEAL_TYPE_LABEL, isDinner, EXTRAS_NAME, isoDate } from '../lib/data.js';
 import { convertLine, formatAmount, formatOriginal, fahrenheitToCelsius } from '../lib/units.js';
 import { loadPlan, planRecipe, addExtra, mondayOf } from '../lib/plan.js';
@@ -6,6 +6,7 @@ import { ShopChecklist } from './ShopChecklist.jsx';
 import { friendly } from '../lib/supabase.js';
 import { go, back } from '../lib/router.js';
 import { Icon } from '../icons.jsx';
+import { PickPhoto } from '../PickPhoto.jsx';
 
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SYSTEM_TEXT = { AU: 'Australian measures', US: 'US measures', UK: 'UK measures', metric: 'metric measures' };
@@ -19,7 +20,6 @@ export function Recipe({ id, household, canEdit, say, userId }) {
   const [planning, setPlanning] = useState(false);
   const [shopping, setShopping] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const fileRef = useRef();
   const urls = usePhotoUrls([recipe?.photo_path]);
 
   if (recipes === null) return <main class="main no-tabs"><p class="cap">Loading…</p></main>;
@@ -29,10 +29,7 @@ export function Recipe({ id, household, canEdit, say, userId }) {
   const prefs = household.settings?.unit_prefs || {};
   const system = recipe.measure_system || 'AU';
 
-  async function onPhoto(e) {
-    const file = e.currentTarget.files?.[0];
-    e.currentTarget.value = '';
-    if (!file) return;
+  async function onPhoto(file) {
     setUploading(true);
     try { await setRecipePhoto(recipe, file, household.id); say('Photo saved'); } catch (err) { say(friendly(err), true); }
     setUploading(false);
@@ -46,10 +43,8 @@ export function Recipe({ id, household, canEdit, say, userId }) {
         <button class="icon-btn float" aria-label="Back" style="left:12px" onClick={() => back('recipes')}><Icon name="back" /></button>
         {canEdit && (
           <>
-            <input ref={fileRef} type="file" accept="image/*" class="sr" onChange={onPhoto} aria-label="Choose a photo" />
-            <button class="btn outline float" style="right:12px;height:44px;font-size:14px;padding:0 14px;border:0" disabled={uploading} onClick={() => fileRef.current.click()}>
-              <Icon name="camera" size={20} />{uploading ? 'Saving…' : photo ? 'Change photo' : 'Add a photo'}
-            </button>
+            <PickPhoto class="btn outline float" title="Photo of the dish" style="right:12px;height:44px;font-size:14px;padding:0 14px;border:0" disabled={uploading}
+              label={uploading ? 'Saving…' : photo ? 'Change photo' : 'Add a photo'} onFile={onPhoto} />
           </>
         )}
       </div>

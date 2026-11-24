@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useRecipes, saveRecipe, deleteRecipe, setRecipePhoto, SEASON_LIST, PROTEINS, MEAL_TYPES, EXTRAS_NAME } from '../lib/data.js';
 import { parseIngredients, parseMethod, splitRecipeText, guessProtein } from '../lib/parse.js';
 import { formatQty } from '../lib/units.js';
@@ -6,6 +6,7 @@ import { supabase, friendly } from '../lib/supabase.js';
 import { go, back } from '../lib/router.js';
 import { Icon } from '../icons.jsx';
 import { PhotoImport } from './PhotoImport.jsx';
+import { PickPhoto } from '../PickPhoto.jsx';
 
 const blankLine = () => ({ quantity: '', unit: '', name: '', note: '', ok: true });
 const qtyText = (q) => (q == null || q === '' ? '' : typeof q === 'number' ? formatQty(q) : q);
@@ -38,10 +39,8 @@ function Form({ existing, household, say }) {
   const [paste, setPaste] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef();
   const [link, setLink] = useState('');
   const [importing, setImporting] = useState(false);
-  const pageRef = useRef();
   const [pageFile, setPageFile] = useState(null);
   const [previews, setPreviews] = useState(null);
 
@@ -155,8 +154,7 @@ function Form({ existing, household, say }) {
             <button class="btn outline" style="height:48px;padding:0 14px" disabled={!link.trim() || importing}>{importing ? 'Reading…' : 'Import'}</button>
           </div>
           <span class="cap">{importing ? 'Reading the recipe from the website…' : 'Tip: on a recipe website, tap Share → What\'s for Dinner? to do this in one step.'}</span>
-          <input ref={pageRef} type="file" accept="image/*" class="sr" aria-label="Choose a photo of a recipe" onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (f) setPageFile(f); }} />
-          <button type="button" class="btn outline" style="height:48px" onClick={() => pageRef.current.click()}><Icon name="camera" size={20} />Read a recipe from a photo</button>
+          <PickPhoto title="Photo of a recipe" label="Read a recipe from a photo" style="height:48px" onFile={setPageFile} />
           <span class="cap">From a cookbook or recipe card. The text is read on this phone.</span>
         </form>
       )}
@@ -169,8 +167,7 @@ function Form({ existing, household, say }) {
         </div>
 
         <div class="row-head" style="gap:12px">
-          <input ref={fileRef} type="file" accept="image/*" class="sr" aria-label="Choose a photo" onChange={(e) => { setPhoto(e.currentTarget.files?.[0] || null); }} />
-          <button type="button" class="btn outline" style="height:44px;font-size:14px" onClick={() => fileRef.current.click()}><Icon name="camera" size={20} />{photo ? 'Change photo' : existing?.photo_path ? 'Change photo' : 'Add a photo'}</button>
+          <PickPhoto title="Photo of the dish" style="height:44px;font-size:14px" label={photo || existing?.photo_path ? 'Change photo' : 'Add a photo'} onFile={setPhoto} />
           <span class="cap">{photo ? (photo.name === 'from-website' ? "Using the website's photo" : photo.name === 'from-page.jpg' ? 'Using the picture from the page' : 'Photo chosen') : 'Optional. Take one or pick from your gallery.'}</span>
         </div>
 

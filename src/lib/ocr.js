@@ -2,7 +2,7 @@
 // It runs inside the browser from files this app serves itself (public/ocr), so photos never
 // leave the phone and no AI service is involved. The files (about 7 MB) download the first
 // time someone reads a photo, then stay cached for offline use.
-import { warp, greyFromRGBA, stretch, outputSize } from './imagefix.js';
+import { warp, greyFromRGBA, stretch, evenLighting, outputSize } from './imagefix.js';
 
 const MAX_SIDE = 3000;
 
@@ -58,10 +58,10 @@ export function straighten(photo, quad, { width = 1200 } = {}) {
   return toCanvas(warp(rgbaOf(photo), photo.width, photo.height, 4, quad, size.w, size.h), size.w, size.h, 4);
 }
 
-// The box straightened, enlarged, in greyscale with the contrast boosted, for reading.
+// The box straightened, enlarged, in greyscale with glare or shadow evened out and the contrast boosted, for reading.
 export function forReading(photo, quad) {
   const { w, h } = outputSize(quad);
-  return toCanvas(stretch(warp(greyOf(photo), photo.width, photo.height, 1, quad, w, h)), w, h, 1);
+  return toCanvas(stretch(evenLighting(warp(greyOf(photo), photo.width, photo.height, 1, quad, w, h), w, h)), w, h, 1);
 }
 
 // Put lines back in reading order, top to bottom, and rejoin a line the reader split in two

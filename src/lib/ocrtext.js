@@ -172,7 +172,8 @@ export function joinMethodLines(boxes) {
       }
     }
     for (const p of paras) {
-      const t = p.text.replace(/^(?:step\s*)?\d+[.):]\s*/i, '').trim();
+      const t = p.text.replace(/^(?:step\s*)?\d+[.):]\s*/i, '').trim()
+        .replace(/(\d)\s?[%Y]2\b/g, '$1½').replace(/(\d)\s?[%Y]4\b/g, '$1¼'); // "1%2 hours" → "1½ hours"
       if (t && lettersIn(t) >= 3) steps.push(t);
     }
   }

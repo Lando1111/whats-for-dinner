@@ -206,3 +206,8 @@ test('a page footer further left does not swallow the list', () => {
     '~½ of a white or yellow onion, roughly chopped', '6 medium fresh tomatoes, quartered, with seeds left in', '4 cloves garlic, roughly chopped']);
   assert.equal(parseIngredient(out[5]).ok, false);
 });
+
+test('fractions inside method text', () => {
+  assert.deepEqual(joinMethodLines([['Cover and cook for 1%2 hours, on low heat.']]), ['Cover and cook for 1½ hours, on low heat.']);
+  assert.deepEqual(joinMethodLines([['Bake for 12 minutes.']]), ['Bake for 12 minutes.']);
+});

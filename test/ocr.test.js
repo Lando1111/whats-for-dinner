@@ -145,8 +145,11 @@ test('bullets read as dots and arrows on a phone photo', () => {
 });
 
 test('fractions misread as letters, and a dropped bracket', () => {
-  assert.equal(cleanIngredientLine('Ya cup (60 ml) cooking oil'), '? cup (60 ml) cooking oil');
-  assert.equal(cleanIngredientLine('Y2 of a white onion'), '? of a white onion');
+  assert.equal(cleanIngredientLine('Ya cup (60 ml) cooking oil'), '~¼ cup (60 ml) cooking oil');
+  assert.equal(cleanIngredientLine('Y2 of a white onion'), '~½ of a white onion');
+  assert.equal(cleanIngredientLine('“2 of a white or yellow onion'), '~½ of a white or yellow onion');
+  let g = parseIngredient('~½ of a white onion');
+  assert.deepEqual([g.quantity, g.name, g.ok], [0.5, 'a white onion', false]);
   assert.equal(cleanIngredientLine('Yams, peeled'), 'Yams, peeled');
   const p = parseIngredient(cleanIngredientLine('Ya cup (60 ml) cooking oil'));
   assert.deepEqual([p.quantity, p.unit, p.ok], [60, 'ml', true]);
@@ -157,4 +160,14 @@ test('fractions misread as letters, and a dropped bracket', () => {
     { text: '(5-cm) sections', x0: 50, x1: 250, h: 30 }
   ];
   assert.deepEqual(joinIngredientLines([box]), ['3 slices Parmesan cheese rind (adds depth of flavor, optional', '4 sausages (1 pound/455 g) cut into 2-inch (5-cm) sections']);
+});
+
+test('a wrapped line placed too far left still joins an open bracket', () => {
+  const box = [
+    { text: '2 quarts (2 L) broth of choice (see homemade', x0: 10, x1: 600, h: 30 },
+    { text: 'options, pages 128-132,', x0: 52, x1: 400, h: 30 },
+    { text: 'Or use store-bought)', x0: 12, x1: 300, h: 30 },
+    { text: '3-5 tablespoons (50-85 g) tomato paste', x0: 11, x1: 590, h: 30 }
+  ];
+  assert.deepEqual(joinIngredientLines([box]), ['2 quarts (2 L) broth of choice (see homemade options, pages 128-132, Or use store-bought)', '3-5 tablespoons (50-85 g) tomato paste']);
 });

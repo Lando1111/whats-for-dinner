@@ -21,10 +21,14 @@ export function cleanIngredientLine(s) {
   if (!t) return '';
 
   // A fraction glyph read as a quote mark or percent sign: amount unknown. Otherwise it was a bullet.
+  // Fractions misread as a mark and a digit, or as letters: "“2 of an onion" (½), "Ya cup" (¼), "Y2 cup" (½).
+  // Filled in as a best guess, starting with "~" so the line stays highlighted for checking.
+  const frac = t.match(/^(?:[’'‘"“”`´]([24])|[YVy]([a2z4])|1\/([az24]))\s*([A-Za-z]+)/);
+  if (frac && (startsAmountWord(frac[4]) || /^of$/i.test(frac[4]))) {
+    const d = frac[1] || frac[2] || frac[3];
+    t = t.replace(/^\S+?(?=\s|[A-Za-z]{2})\s*/, `~${/[a4]/.test(d) ? '¼' : '½'} `);
+  }
   t = t.replace(/^[’'‘"“”`´]+\s+(?=\d)/, ''); // stray mark before an amount
-  // Common misreadings of ¼ ½ ¾ before a unit: "Ya cup", "Y2 cup", "Vz tsp", "1/a cup", "¥ cup".
-  const frac = t.match(/^(?:[YVy][a2z4]|1\/[az]|[¥%])\s+([A-Za-z]+)/);
-  if (frac && (startsAmountWord(frac[1]) || /^of$/i.test(frac[1]))) t = t.replace(/^\S+\s+/, '? ');
   const q = t.match(QUOTE_LEAD);
   if (q) t = startsAmountWord(q[1]) || /^of$/i.test(q[1]) || /^\d/.test(t) ? t.replace(QUOTE_LEAD, '? ') : t.replace(QUOTE_LEAD, '');
 
@@ -112,9 +116,10 @@ export function joinIngredientLines(boxes) {
       // With positions from the photo, the hanging indent decides (a dropped ")" mustn't swallow the next
       // ingredient). Without them (pasted text), go by unfinished brackets and phrases.
       const placed = margin != null && l.x0 != null;
-      const carry = prev && !bulleted && (placed
-        ? indented || /[A-Za-z]-$/.test(prev.text)
-        : hasOpenBracket(prev.text) || endsMidPhrase(prev.text));
+      const startsAmount = /^[\d¼½¾⅓⅔?~]/.test(cleanIngredientLine(text));
+      const carry = prev && !bulleted && (
+        (placed && (indented || /[A-Za-z]-$/.test(prev.text)))
+        || (!startsAmount && (hasOpenBracket(prev.text) || endsMidPhrase(prev.text))));
       if (carry) prev.text = joinText(prev.text, text);
       else { prev = { text }; out.push(prev); }
     }

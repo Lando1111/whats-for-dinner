@@ -43,9 +43,11 @@ export function parseIngredient(raw) {
   let ok = true;
   const notes = [];
 
-  // "?" = the amount couldn't be read (from photo import).
+  // "?" = the amount couldn't be read; "~" = the amount is a best guess (both from photo import).
   let unknownAmount = false;
   if (line.startsWith('?')) { unknownAmount = true; ok = false; line = line.slice(1).trim(); }
+  let guessed = false;
+  if (line.startsWith('~')) { guessed = true; line = line.slice(1).trim(); }
 
   // "2cups rice" → "2 cups rice" (but keep "500g").
   line = line.replace(new RegExp(`^(${NUM})([A-Za-z]{2,})`), (all, n, w) => (METRIC_GLUE.test(w) ? all : `${n} ${w}`));
@@ -63,7 +65,7 @@ export function parseIngredient(raw) {
     const au = unknownAmount ? before.match(new RegExp(`^()()(${UNIT_WORDS})$`)) : before.match(AMOUNT_AND_UNIT);
     const mm = first[1].trim().match(METRIC_IN_BRACKETS);
     if (au && mm && NON_METRIC.includes(normaliseUnit(au[3]))) {
-      if (unknownAmount) { unknownAmount = false; ok = true; } else notes.push(before);
+      if (unknownAmount) { unknownAmount = false; ok = true; } else if (guessed) guessed = false; else notes.push(before);
       line = `${mm[1]}${mm[2] ? `–${mm[2]}` : ''} ${mm[3]} ${line.slice(first.index + first[0].length)}`.replace(/\s+/g, ' ').trim();
     }
   }
@@ -124,6 +126,7 @@ export function parseIngredient(raw) {
     const scraps = words.filter((w) => (w.match(/[A-Za-z]/g) || []).length <= 2).length;
     if (letters < 4 || letters / line.length < 0.6 || (words.length >= 3 && scraps / words.length >= 0.5) || /(?:\b(?:with|and|or|of|plus|to|a|the)|[,\-–])$/i.test(line)) ok = false;
   }
+  if (guessed) ok = false;
   if (!line) { ok = false; line = raw.trim(); }
   const note = notes.filter(Boolean).join(', ');
   return { quantity, unit, name: line, note: note || null, ok };

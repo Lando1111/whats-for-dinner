@@ -1,0 +1,98 @@
+import { useCallback, useEffect, useState } from 'preact/hooks';
+import { supabase, friendly } from './lib/supabase.js';
+import { useRoute, go } from './lib/router.js';
+import { Icon } from './icons.jsx';
+import { SignIn } from './screens/SignIn.jsx';
+import { Onboarding } from './screens/Onboarding.jsx';
+import { Week } from './screens/Week.jsx';
+import { Placeholder } from './screens/Placeholder.jsx';
+import { Settings } from './screens/Settings.jsx';
+import { Household } from './screens/Household.jsx';
+
+const INVITE_KEY = 'wfd-invite';
+const readInvite = () => { try { return localStorage.getItem(INVITE_KEY); } catch { return null; } };
+const clearInvite = () => { try { localStorage.removeItem(INVITE_KEY); } catch { /* ignore */ } };
+
+const TABS = [
+  { name: 'week', label: 'Week', icon: 'week' },
+  { name: 'shopping', label: 'Shopping', icon: 'cart' },
+  { name: 'recipes', label: 'Recipes', icon: 'book' },
+  { name: 'settings', label: 'Settings', icon: 'gear' }
+];
+
+export function App() {
+  const route = useRoute();
+  const [session, setSession] = useState(undefined);
+  const [member, setMember] = useState(undefined); // undefined = loading, null = not in a household
+  const [toast, setToast] = useState(null);
+
+  const say = useCallback((text, err = false) => {
+    setToast({ text, err });
+    setTimeout(() => setToast((t) => (t && t.text === text ? null : t)), 4500);
+  }, []);
+
+  // Remember an invite link so it survives signing in.
+  useEffect(() => {
+    if (route.name === 'join' && route.param) {
+      try { localStorage.setItem(INVITE_KEY, route.param); } catch { /* ignore */ }
+    }
+  }, [route.name, route.param]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  const userId = session?.user?.id;
+  const loadMember = useCallback(async () => {
+    if (!userId) { setMember(undefined); return; }
+    const { data, error } = await supabase
+      .from('household_members')
+      .select('household_id, role, display_name, households(id, name, settings)')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) { say(friendly(error), true); return; }
+    setMember(data || null);
+  }, [userId, say]);
+
+  useEffect(() => { loadMember(); }, [loadMember]);
+
+  let screen;
+  if (session === undefined || (session && member === undefined)) {
+    screen = <div class="main no-tabs"><p class="cap" style="margin:auto">Loading…</p></div>;
+  } else if (!session) {
+    screen = <SignIn say={say} invited={!!readInvite()} />;
+  } else if (member === null) {
+    screen = <Onboarding say={say} invite={readInvite()} onDone={() => { clearInvite(); loadMember(); go('week'); }} onDropInvite={() => { clearInvite(); loadMember(); }} />;
+  } else {
+    const props = { member, household: member.households, reload: loadMember, say, userId };
+    const name = route.name === 'join' ? 'week' : route.name;
+    if (route.name === 'join') { clearInvite(); }
+    if (name === 'settings') screen = <Settings {...props} />;
+    else if (name === 'household') screen = <Household {...props} />;
+    else if (name === 'shopping') screen = <Placeholder title="Shopping list" text="The shared shopping list arrives in a coming build." />;
+    else if (name === 'recipes') screen = <Placeholder title="Recipes" text="Adding and importing recipes arrives in the next build." />;
+    else screen = <Week {...props} />;
+  }
+
+  const showTabs = session && member;
+  const current = route.name === 'household' ? 'settings' : route.name;
+  return (
+    <div class="app">
+      {screen}
+      {showTabs && (
+        <div class="tabs">
+          <nav aria-label="Main">
+            {TABS.map((t) => (
+              <a href={`#/${t.name}`} aria-current={current === t.name || (t.name === 'week' && !TABS.some((x) => x.name === current)) ? 'page' : undefined}>
+                <span><Icon name={t.icon} /></span>{t.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+      )}
+      {toast && <div class={`toast${toast.err ? ' err' : ''}`} role="status">{toast.text}</div>}
+    </div>
+  );
+}

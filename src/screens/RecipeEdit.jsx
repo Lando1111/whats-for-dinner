@@ -43,6 +43,8 @@ function Form({ existing, household, say }) {
   const [importing, setImporting] = useState(false);
   const [pageFile, setPageFile] = useState(null);
   const [previews, setPreviews] = useState(null);
+  const [lastPhoto, setLastPhoto] = useState(null);
+  const [again, setAgain] = useState(null);
 
   async function importLink(url) {
     setImporting(true);
@@ -70,7 +72,25 @@ function Form({ existing, household, say }) {
 
   function applyPhoto(res) {
     setPageFile(null);
+    setAgain(null);
     const parsed = parseIngredients(res.ingredients.join('\n')).map((p) => ({ ...p, quantity: qtyText(p.quantity), unit: p.unit || '', note: p.note || '' }));
+    const flagged = parsed.filter((p) => !p.ok).length;
+    // Remember the photo and boxes so a section can be read again.
+    setLastPhoto((prev) => (res.only && prev && prev.file === res.again.file
+      ? { ...prev, boxes: { ...prev.boxes, ...res.again.boxes } }
+      : { ...res.again, boxes: { ...(prev?.boxes || {}), ...res.again.boxes } }));
+    if (res.only === 'ingredients') {
+      if (!parsed.length) return say("Still couldn't find ingredients in that box. Try a new photo, or type them in.", true);
+      setLines(parsed);
+      setPreviews((p) => ({ ...p, ingredients: res.previews.ingredients }));
+      return say(`Read ${parsed.length} ingredients again${flagged ? `. Check the ${flagged} highlighted` : ''}.`);
+    }
+    if (res.only === 'method') {
+      if (!res.method.length) return say("Still couldn't read the method. Try a new photo, or type it in.", true);
+      setMethod(res.method.join('\n'));
+      setPreviews((p) => ({ ...p, method: res.previews.method }));
+      return say(`Read ${res.method.length} steps again.`);
+    }
     const keep = lines.filter((l) => l.name.trim());
     if (parsed.length) setLines([...keep, ...parsed]);
     if (res.method.length) setMethod((m) => [m.trim(), ...res.method].filter(Boolean).join('\n'));
@@ -83,10 +103,27 @@ function Form({ existing, household, say }) {
     }));
     if (res.dish) setPhoto(new File([res.dish], 'from-page.jpg', { type: 'image/jpeg' }));
     setPreviews(res.previews);
-    const flagged = parsed.filter((p) => !p.ok).length;
     say(parsed.length
       ? `Read ${parsed.length} ingredients${res.method.length ? ` and ${res.method.length} steps` : ''}. Check them against the photo${flagged ? `, especially the ${flagged} highlighted` : ''}.`
       : "Couldn't find ingredients in that box. Try again with the page flatter, or type them in.", !parsed.length);
+  }
+
+  // "Not right?" under each photo preview: adjust the boxes on the same photo, or use a new photo.
+  function readAgain(section) {
+    const done = previews?.[section]?.length > 0;
+    const hasBoxes = lastPhoto?.boxes?.[section]?.length > 0;
+    return (
+      <div class="row-head" style="gap:8px;flex-wrap:wrap;margin:4px 0 12px">
+        <span class="cap" style="font-weight:700">{done ? 'Not right?' : 'Read it from a photo:'}</span>
+        {lastPhoto && (
+          <button type="button" class="btn outline sm" onClick={() => setAgain({ only: section, file: lastPhoto.file, start: lastPhoto })}>
+            <Icon name="edit" size={18} />{hasBoxes ? 'Adjust the boxes' : 'Same photo'}
+          </button>
+        )}
+        <PickPhoto class="btn outline sm" title={section === 'ingredients' ? 'New photo of the ingredients' : 'New photo of the method'} label="New photo"
+          onFile={(f) => setAgain({ only: section, file: f, start: null })} />
+      </div>
+    );
   }
 
   useEffect(() => {
@@ -159,6 +196,7 @@ function Form({ existing, household, say }) {
         </form>
       )}
       {pageFile && <PhotoImport file={pageFile} onDone={applyPhoto} onCancel={() => setPageFile(null)} />}
+      {again && <PhotoImport key={`${again.only}-${again.file.name}-${again.file.lastModified}`} file={again.file} only={again.only} start={again.start} onDone={applyPhoto} onCancel={() => setAgain(null)} />}
 
       <form id="rf" onSubmit={save} style="display:flex;flex-direction:column;gap:16px">
         <div>
@@ -201,6 +239,7 @@ function Form({ existing, household, say }) {
               {previews.ingredients.map((u, i) => <img src={u} alt={`Ingredients from the photo, part ${i + 1}`} />)}
             </details>
           )}
+          {previews?.ingredients?.length > 0 && readAgain('ingredients')}
           {paste !== null && (
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
               <label class="sr" for="paste">Paste ingredients</label>
@@ -233,6 +272,7 @@ function Form({ existing, household, say }) {
               {previews.method.map((u, i) => <img src={u} alt={`Method from the photo, part ${i + 1}`} />)}
             </details>
           )}
+          {(previews?.method?.length > 0 || lastPhoto) && readAgain('method')}
           <textarea id="m" class="field area" rows={6} value={method} onInput={(e) => setMethod(e.currentTarget.value)} placeholder={'One step per line'} />
         </div>
 

@@ -211,3 +211,21 @@ test('fractions inside method text', () => {
   assert.deepEqual(joinMethodLines([['Cover and cook for 1%2 hours, on low heat.']]), ['Cover and cook for 1½ hours, on low heat.']);
   assert.deepEqual(joinMethodLines([['Bake for 12 minutes.']]), ['Bake for 12 minutes.']);
 });
+
+test('numbered method with wrapped lines indented under each number', () => {
+  const box = [
+    { text: 'METHOD', x0: 0, x1: 150, h: 30 },
+    { text: '1. Combine the garlic, turmeric, ginger, lemon zest,', x0: 0, x1: 800, h: 30 },
+    { text: 'broth and chicken thigh into a large pot.', x0: 70, x1: 700, h: 30 },
+    { text: '2. Bring to a rolling simmer, then reduce heat to low', x0: 0, x1: 820, h: 30 },
+    { text: '+ and cook for 10 minutes, stirring occasionally, until', x0: 72, x1: 830, h: 30 },
+    { text: 'chicken is cooked through.', x0: 72, x1: 420, h: 30 },
+    { text: 'NOTES:', x0: 0, x1: 120, h: 30 },
+    { text: 'This soup will keep in the fridge for up to 3 days.', x0: 0, x1: 800, h: 30 }
+  ];
+  assert.deepEqual(joinMethodLines([box]), [
+    'Combine the garlic, turmeric, ginger, lemon zest, broth and chicken thigh into a large pot.',
+    'Bring to a rolling simmer, then reduce heat to low and cook for 10 minutes, stirring occasionally, until chicken is cooked through.',
+    'NOTES: This soup will keep in the fridge for up to 3 days.'
+  ]);
+});

@@ -29,12 +29,16 @@ const inside = (pt, q) => {
   return c;
 };
 
-export function PhotoImport({ file, onDone, onCancel }) {
+// only: read just one section again ('ingredients' or 'method'). start: { rotations, boxes } from the
+// last read of the same photo, so the boxes can be adjusted rather than drawn again.
+export function PhotoImport({ file, onDone, onCancel, only = null, start = null }) {
+  const steps = only ? STEPS.filter((s) => s.key === only).map((s) => ({ ...s, optional: false })) : STEPS;
+  const [rotations, setRotations] = useState(start?.rotations || 0);
   const [photo, setPhoto] = useState(null);
   const [src, setSrc] = useState(null);
   const [err, setErr] = useState(null);
   const [step, setStep] = useState(0);
-  const [boxes, setBoxes] = useState({ ingredients: [], method: [], title: [], photo: [] });
+  const [boxes, setBoxes] = useState(() => ({ ingredients: [], method: [], title: [], photo: [], ...(start?.boxes || {}) }));
   const [active, setActive] = useState(0);
   const [reading, setReading] = useState(null);
   const [scale, setScale] = useState(1);
@@ -44,7 +48,7 @@ export function PhotoImport({ file, onDone, onCancel }) {
   // Load the photo (right way up), then show it.
   useEffect(() => {
     let gone = false;
-    loadPhoto(file).then((c) => { if (!gone) setPhoto(c); }).catch(() => setErr("Couldn't open that photo. Try another one."));
+    loadPhoto(file).then((c) => { for (let i = 0; i < (start?.rotations || 0); i++) c = rotateQuarter(c); if (!gone) setPhoto(c); }).catch(() => setErr("Couldn't open that photo. Try another one."));
     return () => { gone = true; };
   }, [file]);
 
@@ -55,7 +59,7 @@ export function PhotoImport({ file, onDone, onCancel }) {
     return () => url && URL.revokeObjectURL(url);
   }, [photo]);
 
-  const cur = STEPS[step];
+  const cur = steps[step];
   const list = boxes[cur.key];
 
   // Every step starts with one box.
@@ -121,14 +125,16 @@ export function PhotoImport({ file, onDone, onCancel }) {
   function rotate() {
     const r = rotateQuarter(photo);
     setPhoto(r);
+    setRotations((n) => (n + 1) % 4);
     setBoxes({ ingredients: [], method: [], title: [], photo: [] });
     setStep(0);
   }
 
   function next(skip) {
     if (skip) setBoxes((b) => ({ ...b, [cur.key]: [] }));
-    if (step < STEPS.length - 1) { setStep(step + 1); setActive(0); return; }
-    read(skip ? { ...boxes, [cur.key]: [] } : boxes);
+    if (step < steps.length - 1) { setStep(step + 1); setActive(0); return; }
+    const all = skip ? { ...boxes, [cur.key]: [] } : boxes;
+    read(only ? { ingredients: [], method: [], title: [], photo: [], [only]: all[only] } : all);
   }
 
   async function read(all) {
@@ -154,7 +160,9 @@ export function PhotoImport({ file, onDone, onCancel }) {
         servings: findServings(allText),
         system: guessSystem(allText),
         dish,
-        previews: { ingredients: preview('ingredients'), method: preview('method') }
+        previews: { ingredients: preview('ingredients'), method: preview('method') },
+        only,
+        again: { file, rotations, boxes: only ? { [only]: all[only] } : all }
       });
     } catch (e) {
       console.error(e);
@@ -172,7 +180,7 @@ export function PhotoImport({ file, onDone, onCancel }) {
         <header class="row-head" style="gap:4px;padding:8px 12px 0">
           <button class="icon-btn" aria-label="Cancel" onClick={onCancel}><Icon name="close" /></button>
           <h2 class="title" style="font-size:20px;margin:0">{reading ? 'Reading the recipe' : cur.title}</h2>
-          {!reading && <span class="cap" style="margin-left:auto">Step {step + 1} of {STEPS.length}</span>}
+          {!reading && steps.length > 1 && <span class="cap" style="margin-left:auto">Step {step + 1} of {steps.length}</span>}
         </header>
 
         {err && <p class="cap" role="alert" style="margin:0 16px;color:var(--beet);font-weight:600">{err}</p>}
@@ -196,7 +204,7 @@ export function PhotoImport({ file, onDone, onCancel }) {
                   <img src={src} alt="Your recipe photo" onLoad={measure} />
                   <svg ref={svgRef} viewBox={`0 0 ${photo.width} ${photo.height}`} preserveAspectRatio="none"
                     onPointerDown={downOnPhoto} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-                    {STEPS.filter((s) => s.key !== cur.key).flatMap((s) => boxes[s.key].map((q) => (
+                    {steps.filter((s) => s.key !== cur.key).flatMap((s) => boxes[s.key].map((q) => (
                       <polygon points={q.map((p) => p.join(',')).join(' ')} class="quad other" style={`stroke-width:${2 * scale}`} />
                     )))}
                     {/* The box being edited is drawn last so its corners sit on top. */}
@@ -220,13 +228,13 @@ export function PhotoImport({ file, onDone, onCancel }) {
             <div class="row-head" style="gap:8px;padding:0 16px;flex-wrap:wrap">
               {cur.many && <button class="btn outline sm" onClick={addBox} disabled={!photo}><Icon name="plus" size={18} />Add another box</button>}
               {list.length > 1 && <button class="btn outline sm" onClick={removeBox}><Icon name="trash" size={18} />Remove box {active + 1}</button>}
-              {step === 0 && <button class="btn outline sm" onClick={rotate} disabled={!photo}><Icon name="rotate" size={18} />Turn photo</button>}
+              {step === 0 && !only && <button class="btn outline sm" onClick={rotate} disabled={!photo}><Icon name="rotate" size={18} />Turn photo</button>}
             </div>
             <div class="footer-bar" style="display:flex;gap:8px">
               {step > 0 && <button class="btn outline" onClick={() => { setStep(step - 1); setActive(0); }}>Back</button>}
               {cur.optional && <button class="btn outline" onClick={() => next(true)}>Skip</button>}
               <button class="btn" style="flex:1" disabled={!photo || !list.length} onClick={() => next(false)}>
-                {step === STEPS.length - 1 ? 'Read the recipe' : 'Next'}
+                {step === steps.length - 1 ? (only ? 'Read again' : 'Read the recipe') : 'Next'}
               </button>
             </div>
           </>

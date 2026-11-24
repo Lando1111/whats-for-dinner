@@ -150,29 +150,32 @@ export function joinMethodLines(boxes) {
     const lineH = median(sized.map((l) => l.h || 0)) || 30;
     const margin = leftEdge(sized, lineH);
     const right = sized.length ? Math.max(...sized.map((l) => l.x1)) : null;
+    // Numbered steps ("1." "2." …) with wrapped lines indented under them: only a number starts a step.
+    const numberedList = lines.filter((l) => /^(?:step\s*)?\d+[.):]\s+\S/i.test(l.text.trim())).length >= 2;
     const paras = [];
     let cur = null;
     let prevLine = null;
     for (const l of lines) {
-      const text = l.text.replace(/\s+/g, ' ').trim();
-      if (/^(method|directions?|instructions|steps?|preparation)$/i.test(text)) continue;
+      const text = l.text.replace(/\s+/g, ' ').trim().replace(/^[^A-Za-z0-9(“"'‘¼½¾]+\s*/, ''); // stray "+" or "·" at the start
+      if (!text || /^(method|directions?|instructions|steps?|preparation):?$/i.test(text)) continue;
       const numbered = /^(?:step\s*)?\d+[.):]\s+\S/i.test(text);
       const indented = margin != null && l.x0 != null && l.x0 > margin + lineH * 1.2;
       const prevEnded = prevLine && /[.!)]$/.test(prevLine.text.trim()) && right != null && prevLine.x1 != null && prevLine.x1 < right - lineH * 3;
       const prevHeading = prevLine && /^(?:step\s*)?\d+[.):]\s+\S/i.test(prevLine.text) && prevLine.text.length <= 44 && !/[.!?,]$/.test(prevLine.text);
-      if (!cur || numbered || indented || prevEnded || prevHeading) { cur = { text }; paras.push(cur); } else cur.text = joinText(cur.text, text);
+      const backAtMargin = !indented && prevLine && /[.:!?]$/.test(prevLine.text.trim()); // e.g. "NOTES:" after the last step
+      if (!cur || numbered || (numberedList ? backAtMargin : (indented || prevEnded || prevHeading))) { cur = { text }; paras.push(cur); } else cur.text = joinText(cur.text, text);
       prevLine = { ...l, text };
     }
     // A short heading with no full stop ("1. Prep ingredients") joins the step under it.
     for (let i = 0; i < paras.length; i++) {
-      const p = paras[i].text.replace(/^(?:step\s*)?\d+[.):]\s*/i, '');
+      const p = paras[i].text.replace(/^(?:step\s*)?\d+[.):]\s*/i, '').replace(/:$/, '');
       if (i + 1 < paras.length && p.length <= 40 && !/[.!?]$/.test(p)) {
         paras[i + 1].text = `${p}: ${paras[i + 1].text.replace(/^(?:step\s*)?\d+[.):]\s*/i, '')}`;
         paras[i].text = '';
       }
     }
     for (const p of paras) {
-      const t = p.text.replace(/^(?:step\s*)?\d+[.):]\s*/i, '').trim()
+      const t = p.text.replace(/^[^A-Za-z0-9(“"']+/, '').replace(/^(?:step\s*)?\d+[.):]\s*/i, '').trim()
         .replace(/(\d)\s?[%Y]2\b/g, '$1½').replace(/(\d)\s?[%Y]4\b/g, '$1¼'); // "1%2 hours" → "1½ hours"
       if (t && lettersIn(t) >= 3) steps.push(t);
     }

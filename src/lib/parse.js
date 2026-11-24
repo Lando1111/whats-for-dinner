@@ -105,6 +105,7 @@ export function parseIngredient(raw) {
   }
 
   line = line.replace(/^of\s+/i, '').trim();
+  if (quantity != null || unknownAmount || guessed) line = line.replace(/^an?\s+(?=\S)/i, ''); // "½ of a white onion" → "white onion"
   const comma = line.indexOf(',');
   if (comma > 0) {
     notes.push(line.slice(comma + 1).trim());

@@ -6,6 +6,7 @@ export function SignIn({ say, invited }) {
   const [step, setStep] = useState('email');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showCode, setShowCode] = useState(false);
 
   async function send(e) {
     e.preventDefault();
@@ -39,17 +40,27 @@ export function SignIn({ say, invited }) {
         <form onSubmit={send} style="display:flex;flex-direction:column;gap:12px">
           <label class="lbl" for="email" style="margin:0">Your email</label>
           <input id="email" class="field" type="email" autocomplete="email" inputmode="email" required value={email} onInput={(e) => setEmail(e.currentTarget.value)} placeholder="you@example.com" />
-          <button class="btn block" disabled={busy || !email.includes('@')}>{busy ? 'Sending…' : 'Email me a sign-in code'}</button>
+          <button class="btn block" disabled={busy || !email.includes('@')}>{busy ? 'Sending…' : 'Email me a sign-in link'}</button>
           <p class="cap" style="margin:0;text-align:center">No password needed. New here? This creates your account.</p>
         </form>
       ) : (
-        <form onSubmit={verify} style="display:flex;flex-direction:column;gap:12px">
-          <label class="lbl" for="code" style="margin:0">Code sent to {email}</label>
-          <input id="code" class="field code" inputmode="numeric" autocomplete="one-time-code" maxLength={8} required value={code} onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ''))} placeholder="••••••" />
-          <button class="btn block" disabled={busy || code.length < 6}>{busy ? 'Checking…' : 'Sign in'}</button>
-          <p class="cap" style="margin:0;text-align:center">Or tap the link in the email on this phone.</p>
-          <button type="button" class="link" onClick={() => { setStep('email'); setCode(''); }}>Use a different email</button>
-        </form>
+        <div style="display:flex;flex-direction:column;gap:12px;text-align:center">
+          <div class="card" style="padding:20px 16px;display:flex;flex-direction:column;gap:8px">
+            <span style="font-weight:700;font-size:18px">Check your email</span>
+            <span style="font-size:15px;line-height:22px">We've sent a sign-in link to <strong>{email}</strong>. Open the email <strong>on this phone</strong> and tap <strong>Log In</strong>.</span>
+            <span class="cap">It can take a minute to arrive. Check your junk folder too.</span>
+          </div>
+          {showCode ? (
+            <form onSubmit={verify} style="display:flex;flex-direction:column;gap:12px">
+              <label class="lbl" for="code" style="margin:0">Code from the email</label>
+              <input id="code" class="field code" inputmode="numeric" autocomplete="one-time-code" maxLength={8} required value={code} onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ''))} placeholder="••••••" />
+              <button class="btn block" disabled={busy || code.length < 6}>{busy ? 'Checking…' : 'Sign in'}</button>
+            </form>
+          ) : (
+            <button type="button" class="link" onClick={() => setShowCode(true)}>My email has a code instead</button>
+          )}
+          <button type="button" class="link" onClick={() => { setStep('email'); setCode(''); setShowCode(false); }}>Use a different email or send again</button>
+        </div>
       )}
     </main>
   );

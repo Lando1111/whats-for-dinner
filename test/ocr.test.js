@@ -149,6 +149,9 @@ test('fractions misread as letters, and a dropped bracket', () => {
   assert.equal(cleanIngredientLine('Ya cup (60 ml) cooking oil'), '~¼ cup (60 ml) cooking oil');
   assert.equal(cleanIngredientLine('Y2 of a white onion'), '~½ of a white onion');
   assert.equal(cleanIngredientLine('“2 of a white or yellow onion'), '~½ of a white or yellow onion');
+  for (const v of ['%2 of a white onion', '/2 of a white onion', 'Vz of a white onion', "'/2 of a white onion", '1/z of a white onion']) assert.equal(cleanIngredientLine(v), '~½ of a white onion');
+  assert.equal(cleanIngredientLine('%4 cup milk'), '~¼ cup milk');
+  assert.equal(cleanIngredientLine('2 cups flour'), '2 cups flour');
   let g = parseIngredient('~½ of a white onion');
   assert.deepEqual([g.quantity, g.name, g.ok], [0.5, 'white onion', false]);
   assert.equal(parseIngredient('½ of an onion').name, 'onion');

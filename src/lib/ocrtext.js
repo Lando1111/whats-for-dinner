@@ -24,9 +24,9 @@ export function cleanIngredientLine(s) {
   // A fraction glyph read as a quote mark or percent sign: amount unknown. Otherwise it was a bullet.
   // Fractions misread as a mark and a digit, or as letters: "“2 of an onion" (½), "Ya cup" (¼), "Y2 cup" (½).
   // Filled in as a best guess, starting with "~" so the line stays highlighted for checking.
-  const frac = t.match(/^(?:[’'‘"“”`´]([24])|[YVy]([a2z4])|1\/([az24]))\s*([A-Za-z]+)/);
-  if (frac && (startsAmountWord(frac[4]) || /^of$/i.test(frac[4]))) {
-    const d = frac[1] || frac[2] || frac[3];
+  const frac = t.match(/^(?:[%’'‘"“”`´¥\/|]{1,2}|[YVy]|1\/)([24az])\s*([A-Za-z]+)/);
+  if (frac && (startsAmountWord(frac[2]) || /^of$/i.test(frac[2]))) {
+    const d = frac[1];
     t = t.replace(/^\S+?(?=\s|[A-Za-z]{2})\s*/, `~${/[a4]/.test(d) ? '¼' : '½'} `);
   }
   t = t.replace(/^[’'‘"“”`´]+\s+(?=\d)/, ''); // stray mark before an amount

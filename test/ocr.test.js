@@ -80,7 +80,7 @@ test('unreadable amounts and fragments are flagged', () => {
   assert.equal(parseIngredient('Seq enla If. hd: ;').ok, false);
   assert.equal(parseIngredient('Sea salt').ok, true);
   assert.equal(parseIngredient('Freshly ground black pepper').ok, true);
-  assert.equal(parseIngredient('cooked rice (leftover rice').ok, false);
+  assert.deepEqual([parseIngredient('3 slices Parmesan rind (adds depth, optional').note, parseIngredient('cooked rice (leftover rice').ok], ['adds depth, optional', true]);
 });
 
 test('pints, quarts and tbs read as ths', () => {
@@ -142,4 +142,19 @@ test('bullets read as dots and arrows on a phone photo', () => {
   assert.equal(cleanIngredientLine('’ cup oil'), '? cup oil');
   assert.equal(parseIngredient('. 2 vegetable stock cubes').quantity, 2);
   assert.equal(parseIngredient('.5 cup milk').quantity, 0.5);
+});
+
+test('fractions misread as letters, and a dropped bracket', () => {
+  assert.equal(cleanIngredientLine('Ya cup (60 ml) cooking oil'), '? cup (60 ml) cooking oil');
+  assert.equal(cleanIngredientLine('Y2 of a white onion'), '? of a white onion');
+  assert.equal(cleanIngredientLine('Yams, peeled'), 'Yams, peeled');
+  const p = parseIngredient(cleanIngredientLine('Ya cup (60 ml) cooking oil'));
+  assert.deepEqual([p.quantity, p.unit, p.ok], [60, 'ml', true]);
+  const box = [
+    { text: '3 slices Parmesan cheese rind (adds depth of', x0: 10, x1: 600, h: 30 },
+    { text: 'flavor, optional', x0: 52, x1: 300, h: 30 },
+    { text: '4 sausages (1 pound/455 g) cut into 2-inch', x0: 11, x1: 590, h: 30 },
+    { text: '(5-cm) sections', x0: 50, x1: 250, h: 30 }
+  ];
+  assert.deepEqual(joinIngredientLines([box]), ['3 slices Parmesan cheese rind (adds depth of flavor, optional', '4 sausages (1 pound/455 g) cut into 2-inch (5-cm) sections']);
 });

@@ -22,6 +22,9 @@ export function cleanIngredientLine(s) {
 
   // A fraction glyph read as a quote mark or percent sign: amount unknown. Otherwise it was a bullet.
   t = t.replace(/^[’'‘"“”`´]+\s+(?=\d)/, ''); // stray mark before an amount
+  // Common misreadings of ¼ ½ ¾ before a unit: "Ya cup", "Y2 cup", "Vz tsp", "1/a cup", "¥ cup".
+  const frac = t.match(/^(?:[YVy][a2z4]|1\/[az]|[¥%])\s+([A-Za-z]+)/);
+  if (frac && (startsAmountWord(frac[1]) || /^of$/i.test(frac[1]))) t = t.replace(/^\S+\s+/, '? ');
   const q = t.match(QUOTE_LEAD);
   if (q) t = startsAmountWord(q[1]) || /^of$/i.test(q[1]) || /^\d/.test(t) ? t.replace(QUOTE_LEAD, '? ') : t.replace(QUOTE_LEAD, '');
 
@@ -106,7 +109,12 @@ export function joinIngredientLines(boxes) {
       }
       if (skipping) continue;
       const indented = margin != null && l.x0 != null && l.x0 > margin + lineH * 0.8;
-      const carry = prev && !bulleted && (indented || hasOpenBracket(prev.text) || endsMidPhrase(prev.text));
+      // With positions from the photo, the hanging indent decides (a dropped ")" mustn't swallow the next
+      // ingredient). Without them (pasted text), go by unfinished brackets and phrases.
+      const placed = margin != null && l.x0 != null;
+      const carry = prev && !bulleted && (placed
+        ? indented || /[A-Za-z]-$/.test(prev.text)
+        : hasOpenBracket(prev.text) || endsMidPhrase(prev.text));
       if (carry) prev.text = joinText(prev.text, text);
       else { prev = { text }; out.push(prev); }
     }

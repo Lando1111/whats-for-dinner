@@ -50,7 +50,11 @@ export function parseIngredient(raw) {
   // "2cups rice" → "2 cups rice" (but keep "500g").
   line = line.replace(new RegExp(`^(${NUM})([A-Za-z]{2,})`), (all, n, w) => (METRIC_GLUE.test(w) ? all : `${n} ${w}`));
 
-  if (/\(/.test(line) && (line.match(/\(/g) || []).length !== (line.match(/\)/g) || []).length) ok = false;
+  // Brackets: close one the photo lost ("(adds depth of flavor, optional"); a stray ")" is checked by a person.
+  const opens = (line.match(/\(/g) || []).length;
+  const closes = (line.match(/\)/g) || []).length;
+  if (opens > closes) line += ')'.repeat(opens - closes);
+  else if (closes > opens) ok = false;
 
   // A metric amount in brackets right after the amount and unit replaces it.
   const first = line.match(/\(([^)]*)\)/);

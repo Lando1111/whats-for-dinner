@@ -103,3 +103,17 @@ export function splitRecipeText(text) {
   }
   return null;
 }
+
+// Suggest a protein from ingredient names (the person confirms on the form).
+const PROTEIN_WORDS = [
+  ['fish', ['fish', 'salmon', 'tuna', 'prawn', 'shrimp', 'barramundi', 'snapper', 'cod', 'mussel', 'calamari', 'squid', 'scallop', 'crab', 'seafood']],
+  ['chicken', ['chicken', 'turkey']],
+  ['beef', ['beef', 'steak', 'brisket', 'mince', 'veal']],
+  ['lamb', ['lamb', 'mutton']],
+  ['pork', ['pork', 'bacon', 'ham', 'prosciutto', 'chorizo', 'sausage', 'pancetta', 'salami']]
+];
+export function guessProtein(names) {
+  const text = ` ${names.join(' ').toLowerCase()} `;
+  for (const [p, words] of PROTEIN_WORDS) if (words.some((w) => new RegExp(`[^a-z]${w}(s|es)?[^a-z]`).test(text))) return p;
+  return 'vegetarian';
+}

@@ -72,3 +72,11 @@ test('sections', () => {
   assert.equal(guessSection('sourdough bread'), 'bakery');
   assert.equal(guessSection('dishwashing liquid'), 'household');
 });
+
+import { guessProtein } from '../src/lib/parse.js';
+test('protein guess', () => {
+  assert.equal(guessProtein(['beef mince', 'onion']), 'beef');
+  assert.equal(guessProtein(['chicken thighs']), 'chicken');
+  assert.equal(guessProtein(['rice', 'frozen peas', 'eggs']), 'vegetarian');
+  assert.equal(guessProtein(['hamburger buns', 'mushrooms']), 'vegetarian');
+});

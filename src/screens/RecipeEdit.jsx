@@ -1,8 +1,8 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { useRecipes, saveRecipe, deleteRecipe, setRecipePhoto, SEASON_LIST, PROTEINS } from '../lib/data.js';
-import { parseIngredients, parseMethod, splitRecipeText } from '../lib/parse.js';
+import { parseIngredients, parseMethod, splitRecipeText, guessProtein } from '../lib/parse.js';
 import { formatQty } from '../lib/units.js';
-import { friendly } from '../lib/supabase.js';
+import { supabase, friendly } from '../lib/supabase.js';
 import { go, back } from '../lib/router.js';
 import { Icon } from '../icons.jsx';
 
@@ -37,6 +37,38 @@ function Form({ existing, household, say }) {
   const [photo, setPhoto] = useState(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef();
+  const [link, setLink] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  async function importLink(url) {
+    setImporting(true);
+    const { data, error } = await supabase.functions.invoke('import-recipe', { body: { url } });
+    setImporting(false);
+    if (error) {
+      let msg = "Couldn't import that page. Try copying the recipe text and using Paste a list.";
+      try { const b = await error.context?.json(); if (b?.error) msg = b.error; } catch { /* keep default */ }
+      return say(msg, true);
+    }
+    const parsed = parseIngredients((data.ingredients || []).join('\n')).map((p) => ({ ...p, quantity: qtyText(p.quantity), unit: p.unit || '', note: p.note || '' }));
+    const text = (data.ingredients || []).join(' ');
+    const measure = /\.au$/.test(data.site) ? 'AU' : /\.uk$/.test(data.site) ? 'UK' : /\b(cups?|tbsp|tsp|oz|lbs?|tablespoons?|teaspoons?)\b/i.test(text) ? 'US' : 'metric';
+    setR((cur) => ({ ...cur, protein: cur.protein || (parsed.length ? guessProtein(parsed.map((x) => x.name)) : null), title: data.title || cur.title, servings: data.servings || cur.servings, source_url: data.source_url, source_note: data.site, measure_system: measure }));
+    if (parsed.length) setLines(parsed);
+    if (data.method?.length) setMethod(data.method.join('\n'));
+    if (data.image?.data) {
+      const bytes = Uint8Array.from(atob(data.image.data), (c) => c.charCodeAt(0));
+      setPhoto(new File([bytes], 'from-website', { type: data.image.type }));
+    }
+    setLink('');
+    const flagged = parsed.filter((p) => !p.ok).length;
+    say(`Imported from ${data.site}. Check the measurements${flagged ? ` and the ${flagged} highlighted lines` : ''}, then save.`);
+  }
+
+  useEffect(() => {
+    let shared = null;
+    try { shared = sessionStorage.getItem('wfd-share'); sessionStorage.removeItem('wfd-share'); } catch { /* ignore */ }
+    if (shared && !existing) importLink(shared);
+  }, []);
 
   const set = (k, v) => setR({ ...r, [k]: v });
   const setLine = (i, k, v) => setLines(lines.map((l, j) => (j === i ? { ...l, [k]: v, ok: true } : l)));
@@ -53,6 +85,7 @@ function Form({ existing, household, say }) {
     const parsed = parseIngredients(split ? split.ingredients : paste).map((p) => ({ ...p, quantity: qtyText(p.quantity), unit: p.unit || '', note: p.note || '' }));
     const keep = lines.filter((l) => l.name.trim());
     setLines([...keep, ...parsed]);
+    if (!r.protein && parsed.length) set('protein', guessProtein([...keep, ...parsed].map((x) => x.name)));
     if (split && !method.trim()) setMethod(parseMethod(split.method).join('\n'));
     if (/\b(cups?|tbsp|tsp)\b/i.test(paste) && /\b(oz|lb|°F)\b/.test(paste)) set('measure_system', 'US');
     setPaste(null);
@@ -88,6 +121,17 @@ function Form({ existing, household, say }) {
         <h1 class="title">{existing ? 'Edit recipe' : 'New recipe'}</h1>
       </header>
 
+      {!existing && (
+        <form onSubmit={(e) => { e.preventDefault(); if (link.trim()) importLink(link.trim()); }} class="card" style="padding:12px;display:flex;flex-direction:column;gap:8px">
+          <label class="lbl" for="link" style="margin:0">Import from a website</label>
+          <div style="display:flex;gap:8px">
+            <input id="link" class="field" type="url" inputmode="url" placeholder="Paste a recipe link" value={link} onInput={(e) => setLink(e.currentTarget.value)} />
+            <button class="btn outline" style="height:48px;padding:0 14px" disabled={!link.trim() || importing}>{importing ? 'Reading…' : 'Import'}</button>
+          </div>
+          <span class="cap">{importing ? 'Reading the recipe from the website…' : 'Tip: on a recipe website, tap Share → What\'s for dinner? to do this in one step.'}</span>
+        </form>
+      )}
+
       <form id="rf" onSubmit={save} style="display:flex;flex-direction:column;gap:16px">
         <div>
           <label class="lbl" for="t">Name</label>
@@ -96,8 +140,8 @@ function Form({ existing, household, say }) {
 
         <div class="row-head" style="gap:12px">
           <input ref={fileRef} type="file" accept="image/*" class="sr" aria-label="Choose a photo" onChange={(e) => { setPhoto(e.currentTarget.files?.[0] || null); }} />
-          <button type="button" class="btn outline" style="height:44px;font-size:14px" onClick={() => fileRef.current.click()}><Icon name="camera" size={20} />{photo ? 'Photo chosen' : existing?.photo_path ? 'Change photo' : 'Add a photo'}</button>
-          <span class="cap">{photo ? photo.name : 'Optional. Take one or pick from your gallery.'}</span>
+          <button type="button" class="btn outline" style="height:44px;font-size:14px" onClick={() => fileRef.current.click()}><Icon name="camera" size={20} />{photo ? 'Change photo' : existing?.photo_path ? 'Change photo' : 'Add a photo'}</button>
+          <span class="cap">{photo ? (photo.name === 'from-website' ? "Using the website's photo" : 'Photo chosen') : 'Optional. Take one or pick from your gallery.'}</span>
         </div>
 
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">

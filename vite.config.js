@@ -20,6 +20,7 @@ export default defineConfig({
         scope: base,
         display: 'standalone',
         orientation: 'portrait',
+        share_target: { action: base, method: 'GET', params: { title: 'title', text: 'text', url: 'url' } },
         background_color: '#fbf7f0',
         theme_color: '#fbf7f0',
         icons: [

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { cleanIngredientLine, joinIngredientLines, joinMethodLines, findServings, tidyTitle, guessSystem } from '../src/lib/ocrtext.js';
 import { parseIngredient, parseIngredients } from '../src/lib/parse.js';
 import { normaliseUnit, convertLine } from '../src/lib/units.js';
+import { fixSpelling } from '../src/lib/spellfix.js';
 
 test('look-alike characters and glued amounts', () => {
   assert.equal(cleanIngredientLine('2cups cooked rice'), '2 cups cooked rice');
@@ -170,4 +171,16 @@ test('a wrapped line placed too far left still joins an open bracket', () => {
     { text: '3-5 tablespoons (50-85 g) tomato paste', x0: 11, x1: 590, h: 30 }
   ];
   assert.deepEqual(joinIngredientLines([box]), ['2 quarts (2 L) broth of choice (see homemade options, pages 128-132, Or use store-bought)', '3-5 tablespoons (50-85 g) tomato paste']);
+});
+
+test('one-letter misreads of cooking words are corrected', () => {
+  assert.equal(fixSpelling('60 ml cocking oil, coconut, avocado'), '60 ml cooking oil, coconut, avocado');
+  assert.equal(fixSpelling('2 gorlic cloves'), '2 garlic cloves');
+  assert.equal(fixSpelling('1 zucchmni'), '1 zucchini');
+  assert.equal(fixSpelling('broth of chojce'), 'broth of choice');
+  assert.equal(fixSpelling('Israeli couscous or mille;'), 'Israeli couscous or millet');
+  // Real words and short words are left alone.
+  for (const ok of ['Sea salt', '2 large eggs', 'Freshly ground black pepper', '1 lime', 'tomato paste, optional', '3 slices Parmesan cheese rind']) {
+    assert.equal(fixSpelling(ok), ok);
+  }
 });

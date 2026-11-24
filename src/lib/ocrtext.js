@@ -1,6 +1,7 @@
 // Tidy text read from a photo (on-device OCR) before the normal recipe parser sees it.
 // Plain rules for the mistakes text recognition makes on cookbook pages. No AI.
 import { normaliseUnit } from './units.js';
+import { fixSpelling } from './spellfix.js';
 
 // Words that follow an amount at the start of an ingredient line, besides units.
 const COUNT_WORDS = new Set(['large', 'medium', 'small', 'whole', 'piece', 'pieces', 'bunch', 'bunches', 'handful', 'handfuls',
@@ -124,7 +125,7 @@ export function joinIngredientLines(boxes) {
       else { prev = { text }; out.push(prev); }
     }
   }
-  return out.map((l) => cleanIngredientLine(l.text)).filter((t) => t && lettersIn(t) >= 2);
+  return out.map((l) => fixSpelling(cleanIngredientLine(l.text))).filter((t) => t && lettersIn(t) >= 2);
 }
 
 /**

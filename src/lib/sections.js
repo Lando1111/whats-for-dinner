@@ -13,7 +13,7 @@ export const SECTIONS = [
 export const SECTION_LABEL = Object.fromEntries(SECTIONS.map((s) => [s.id, s.label]));
 
 // Order matters: earlier rules win ("frozen peas" → frozen before "peas" → fruit & veg).
-const RULES = [
+export const SECTION_RULES = [
   ['fruit_veg', ['eggplant', 'butternut', 'spring onion', 'sweet potato', 'baby spinach', 'snow pea', 'fresh herbs']],
   ['frozen', ['frozen', 'ice cream', 'fish fingers', 'puff pastry', 'shortcrust pastry', 'filo']],
   ['pantry', ['tinned', 'canned', 'tin ', 'can ', 'stock', 'broth', 'passata', 'paste', 'sauce', 'oil', 'vinegar', 'flour', 'sugar', 'salt', 'pepper', 'spice', 'cumin', 'paprika', 'chilli powder', 'chili powder', 'cinnamon', 'oregano', 'dried', 'rice', 'pasta', 'spaghetti', 'penne', 'noodle', 'couscous', 'quinoa', 'lentil', 'chickpea', 'kidney bean', 'black bean', 'cannellini', 'baked beans', 'oats', 'cereal', 'honey', 'syrup', 'jam', 'peanut butter', 'nuts', 'almond', 'cashew', 'walnut', 'seeds', 'breadcrumb', 'panko', 'coconut milk', 'coconut cream', 'cocoa', 'chocolate', 'baking powder', 'bicarb', 'yeast', 'vanilla', 'stock cube', 'gravy', 'mustard', 'mayonnaise', 'ketchup', 'tomato sauce', 'soy', 'curry', 'taco', 'tortilla', 'wrap', 'crackers', 'biscuit', 'chips', 'tea', 'coffee', 'tuna', 'salmon tin', 'sultana', 'raisin', 'coconut']],
@@ -27,7 +27,7 @@ const RULES = [
 
 export function guessSection(name) {
   const n = ` ${(name || '').toLowerCase()} `;
-  for (const [section, words] of RULES) {
+  for (const [section, words] of SECTION_RULES) {
     // Match at the start of a word, so "unsalted" doesn't match "salt".
     if (words.some((w) => new RegExp(`[^a-z]${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(n))) return section;
   }

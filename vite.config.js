@@ -4,12 +4,18 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const base = '/whats-for-dinner/';
 
+// Shown at the bottom of Settings so we can tell which version a phone is running.
+const sha = (process.env.GITHUB_SHA || 'local').slice(0, 7);
+const built = new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+
 export default defineConfig({
   base,
+  define: { __VERSION__: JSON.stringify(`${built} · ${sha}`) },
   plugins: [
     preact(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
       includeAssets: ['icons/*'],
       manifest: {
         name: "What's for Dinner?",

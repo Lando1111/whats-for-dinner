@@ -94,6 +94,7 @@ export function Settings({ member, household, reload, say }) {
       </section>
 
       <button class="link" style="align-self:center" onClick={() => supabase.auth.signOut()}>Sign out</button>
+      <p class="cap" style="text-align:center;margin:0">Version {__VERSION__}</p>
     </main>
   );
 }

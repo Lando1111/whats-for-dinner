@@ -2,6 +2,19 @@ import { render } from 'preact';
 import { App } from './app.jsx';
 import { applyTheme, getTheme } from './lib/theme.js';
 import './styles.css';
+import { registerSW } from 'virtual:pwa-register';
+
+// Install updates as soon as they're published: check when the app opens, whenever it's brought
+// back to the front, and hourly. A new version reloads the app once it's installed.
+registerSW({
+  immediate: true,
+  onRegisteredSW(_url, reg) {
+    if (!reg) return;
+    const check = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    setInterval(check, 60 * 60 * 1000);
+  }
+});
 
 applyTheme(getTheme());
 

@@ -10,9 +10,11 @@ export const UNIT_ALIASES = {
   ml: ['ml', 'mls', 'millilitre', 'millilitres', 'milliliter', 'milliliters'],
   l: ['l', 'litre', 'litres', 'liter', 'liters', 'ltr'],
   tsp: ['tsp', 'tsps', 't', 'teaspoon', 'teaspoons', 'teasp'],
-  tbsp: ['tbsp', 'tbsps', 'tbs', 'tbl', 'tblsp', 'tablespoon', 'tablespoons', 'tbspn', 'T'],
+  tbsp: ['tbsp', 'tbsps', 'tbs', 'ths', 'tbl', 'tblsp', 'tablespoon', 'tablespoons', 'tbspn', 'T'],
   cup: ['cup', 'cups', 'c'],
   fl_oz: ['fl oz', 'floz', 'fluid ounce', 'fluid ounces'],
+  pint: ['pint', 'pints', 'pt'],
+  quart: ['quart', 'quarts', 'qt'],
   pinch: ['pinch', 'pinches'],
   tin: ['tin', 'tins', 'can', 'cans'],
   clove: ['clove', 'cloves'],
@@ -41,10 +43,10 @@ const MASS_G = { g: 1, kg: 1000, oz: 28.3495, lb: 453.592 };
 
 // Millilitres per unit in each measuring system.
 const VOLUME_ML = {
-  AU: { ml: 1, l: 1000, tsp: 5, tbsp: 20, cup: 250, fl_oz: 28.41 },
-  US: { ml: 1, l: 1000, tsp: 4.929, tbsp: 14.787, cup: 236.59, fl_oz: 29.574 },
-  UK: { ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 250, fl_oz: 28.41 },
-  metric: { ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 250, fl_oz: 28.41 }
+  AU: { ml: 1, l: 1000, tsp: 5, tbsp: 20, cup: 250, fl_oz: 28.41, pint: 568.26, quart: 1136.52 },
+  US: { ml: 1, l: 1000, tsp: 4.929, tbsp: 14.787, cup: 236.59, fl_oz: 29.574, pint: 473.18, quart: 946.35 },
+  UK: { ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 250, fl_oz: 28.41, pint: 568.26, quart: 1136.52 },
+  metric: { ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 250, fl_oz: 28.41, pint: 568.26, quart: 1136.52 }
 };
 
 export const isMass = (u) => u in MASS_G;
@@ -101,11 +103,11 @@ export function formatQty(q) {
 }
 
 const roundTo = (q, step) => Math.round(q / step) * step;
-const UNIT_LABEL = { g: 'g', kg: 'kg', ml: 'ml', l: 'L', tsp: 'tsp', tbsp: 'tbsp', cup: 'cup', oz: 'oz', lb: 'lb', fl_oz: 'fl oz' };
+const UNIT_LABEL = { g: 'g', kg: 'kg', ml: 'ml', l: 'L', tsp: 'tsp', tbsp: 'tbsp', cup: 'cup', oz: 'oz', lb: 'lb', fl_oz: 'fl oz', pint: 'pint', quart: 'quart' };
 
 export function unitLabel(unit, q = 1) {
   if (!unit) return '';
-  if (UNIT_LABEL[unit]) return unit === 'cup' && q > 1 ? 'cups' : UNIT_LABEL[unit];
+  if (UNIT_LABEL[unit]) return ['cup', 'pint', 'quart'].includes(unit) && q > 1 ? `${UNIT_LABEL[unit]}s` : UNIT_LABEL[unit];
   return q > 1 && !unit.endsWith('s') ? `${unit}s` : unit;
 }
 
@@ -144,7 +146,7 @@ export function convertLine(line, { system = 'AU', prefs = {}, multiplier = 1, d
   if (isVolume(unit)) {
     const ml = toMl(q0, unit, system);
     const sourceIsMetric = system === 'AU' || system === 'metric';
-    const changedSystem = !sourceIsMetric && ['tsp', 'tbsp', 'cup', 'fl_oz'].includes(unit);
+    const changedSystem = !sourceIsMetric && ['tsp', 'tbsp', 'cup', 'fl_oz', 'pint', 'quart'].includes(unit);
     // Small amounts stay in spoons (in Australian spoon sizes).
     if (ml < 62.5 && unit !== 'ml' && unit !== 'l') {
       const s = spoons(ml);
@@ -180,7 +182,7 @@ export function formatOriginal(line, multiplier = 1, system = 'AU') {
   if (line.quantity == null) return '';
   const u = normaliseUnit(line.unit) || line.unit;
   const amt = formatAmount({ q: Number(line.quantity) * multiplier, unit: u });
-  const sys = system === 'US' && ['tsp', 'tbsp', 'cup', 'fl_oz'].includes(u) ? 'US ' : system === 'UK' && u === 'fl_oz' ? 'UK ' : '';
+  const sys = system === 'US' && ['tsp', 'tbsp', 'cup', 'fl_oz', 'pint', 'quart'].includes(u) ? 'US ' : system === 'UK' && ['fl_oz', 'pint'].includes(u) ? 'UK ' : '';
   return sys ? amt.replace(/^([\d¼½¾⅓⅔⅛.]+) /, `$1 ${sys}`) : amt;
 }
 

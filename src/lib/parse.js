@@ -21,23 +21,50 @@ export function parseNumber(s) {
 }
 
 const UNIT_WORDS = 'fl\\.? oz|fluid ounces?|[A-Za-z]+\\.?';
+// Units that books often follow with a metric amount in brackets: "2 cups (410 g)", "2 quarts (2 L)".
+const NON_METRIC = ['cup', 'tbsp', 'tsp', 'quart', 'pint', 'oz', 'lb', 'fl_oz'];
+const METRIC_IN_BRACKETS = new RegExp(`^(?:about|approx\\.?|approximately|~)?\\s*(${NUM})(?:\\s*[-–]\\s*(${NUM}))?\\s*(g|kg|ml|l)$`, 'i');
+const AMOUNT_AND_UNIT = new RegExp(`^(${NUM})(?:\\s*(?:-|–|to)\\s*(${NUM}))?\\s*(${UNIT_WORDS})\\s*$`);
+const METRIC_GLUE = /^(?:g|gm|gms|kg|kgs|ml|mls|l|lb|lbs|oz)$/i;
 
 /**
  * Parse one ingredient line.
  * "1 ½ cups plain flour, sifted" → { quantity: 1.5, unit: 'cup', name: 'plain flour', note: 'sifted', ok: true }
+ * "2 cups (410 g) cooked rice" → 410 g, with "2 cups" kept in the note.
+ * "? cup oil" (amount unreadable in a photo) → no amount, flagged.
  * ok = false when the line looks odd and should be checked by a person.
  */
 export function parseIngredient(raw) {
-  let line = (raw || '').replace(/^[\s•*·\-–—]+|^\d+[.)]\s+(?=\D)/, '').replace(/\s+/g, ' ').trim();
+  let line = (raw || '').replace(/^[\s•*·+»›◦▪●∙‣\-–—]+|^\d+[.)]\s+(?=\D)/, '').replace(/\s+/g, ' ').trim();
   if (!line) return null;
-  let note = null;
   let quantity = null;
   let unit = null;
   let ok = true;
+  const notes = [];
 
-  // Pull out notes: text in brackets, or after the first comma.
-  const br = line.match(/\(([^)]*)\)/);
-  if (br) { note = br[1].trim(); line = line.replace(br[0], ' ').replace(/\s+/g, ' ').trim(); }
+  // "?" = the amount couldn't be read (from photo import).
+  let unknownAmount = false;
+  if (line.startsWith('?')) { unknownAmount = true; ok = false; line = line.slice(1).trim(); }
+
+  // "2cups rice" → "2 cups rice" (but keep "500g").
+  line = line.replace(new RegExp(`^(${NUM})([A-Za-z]{2,})`), (all, n, w) => (METRIC_GLUE.test(w) ? all : `${n} ${w}`));
+
+  if (/\(/.test(line) && (line.match(/\(/g) || []).length !== (line.match(/\)/g) || []).length) ok = false;
+
+  // A metric amount in brackets right after the amount and unit replaces it.
+  const first = line.match(/\(([^)]*)\)/);
+  if (first) {
+    const before = line.slice(0, first.index).trim();
+    const au = unknownAmount ? before.match(new RegExp(`^()()(${UNIT_WORDS})$`)) : before.match(AMOUNT_AND_UNIT);
+    const mm = first[1].trim().match(METRIC_IN_BRACKETS);
+    if (au && mm && NON_METRIC.includes(normaliseUnit(au[3]))) {
+      if (unknownAmount) { unknownAmount = false; ok = true; } else notes.push(before);
+      line = `${mm[1]}${mm[2] ? `–${mm[2]}` : ''} ${mm[3]} ${line.slice(first.index + first[0].length)}`.replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  // Every other bracket becomes part of the note.
+  line = line.replace(/\(([^)]*)\)/g, (all, inner) => { if (inner.trim()) notes.push(inner.trim()); return ' '; }).replace(/\s+/g, ' ').trim();
 
   // "2 x 400 g tins chickpeas" / "2 × 400g cans"
   let m = line.match(new RegExp(`^(${NUM})\\s*[x×]\\s*(${NUM})\\s*(g|ml|kg|oz)\\b\\s*(.*)$`, 'i'));
@@ -47,8 +74,11 @@ export function parseIngredient(raw) {
     let rest = m[4];
     const um = rest.match(/^(\S+)\s+(.*)$/);
     if (um && normaliseUnit(um[1])) { unit = normaliseUnit(um[1]); rest = um[2]; } else { unit = 'tin'; }
-    note = note ? `${size}, ${note}` : size;
+    notes.unshift(size);
     line = rest;
+  } else if (unknownAmount) {
+    const um = line.match(new RegExp(`^(${UNIT_WORDS})\\s+(.*)$`));
+    if (um && normaliseUnit(um[1])) { unit = normaliseUnit(um[1]); line = um[2]; }
   } else {
     // Amount, optional range ("1-2"), optional unit.
     m = line.match(new RegExp(`^(${NUM})(?:\\s*(?:-|–|to)\\s*(${NUM}))?\\s*(${UNIT_WORDS})?\\s+(.*)$`));
@@ -59,7 +89,7 @@ export function parseIngredient(raw) {
       line = glued[3];
     } else if (m) {
       quantity = parseNumber(m[1]);
-      if (m[2]) note = note ? `${m[1].trim()}–${m[2].trim()}, ${note}` : `${m[1].trim()}–${m[2].trim()}`;
+      if (m[2]) notes.unshift(`${m[1].trim()}–${m[2].trim()}`);
       const u = m[3] && normaliseUnit(m[3]);
       if (u) { unit = u; line = m[4]; } else { line = `${m[3] ? m[3] + ' ' : ''}${m[4]}`; }
     } else if (/^\d/.test(line)) {
@@ -70,13 +100,27 @@ export function parseIngredient(raw) {
   line = line.replace(/^of\s+/i, '').trim();
   const comma = line.indexOf(',');
   if (comma > 0) {
-    const after = line.slice(comma + 1).trim();
-    note = note ? `${note}, ${after}` : after;
+    notes.push(line.slice(comma + 1).trim());
     line = line.slice(0, comma).trim();
   }
 
   if (/\d[a-z]|[a-z]\d/i.test(line) || (quantity != null && quantity > 5000)) ok = false;
+  // Amounts that are probably misread: "14 tbsp" (was 1½), "25 cups".
+  if (quantity != null && ((['tsp', 'tbsp'].includes(unit) && quantity >= 10) || (unit === 'cup' && quantity > 10))) ok = false;
+  // Odd capitals inside a word ("pepPPE") come from misread text.
+  if (/[a-z][A-Z]/.test(line)) ok = false;
+  // Lines with no amount that look like a piece of another line, or like misread text.
+  if (quantity == null && !unknownAmount) {
+    // Starts with a unit but has no amount: "tablespoons sesame oil".
+    const firstWord = line.split(' ')[0];
+    if (firstWord.length > 2 && normaliseUnit(firstWord)) ok = false;
+    const letters = (line.match(/[A-Za-z]/g) || []).length;
+    const words = line.split(' ');
+    const scraps = words.filter((w) => (w.match(/[A-Za-z]/g) || []).length <= 2).length;
+    if (letters < 4 || letters / line.length < 0.6 || (words.length >= 3 && scraps / words.length >= 0.5) || /(?:\b(?:with|and|or|of|plus|to|a|the)|[,\-–])$/i.test(line)) ok = false;
+  }
   if (!line) { ok = false; line = raw.trim(); }
+  const note = notes.filter(Boolean).join(', ');
   return { quantity, unit, name: line, note: note || null, ok };
 }
 

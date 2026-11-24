@@ -5,13 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "predev": "node scripts/copy-ocr.mjs",
     "build": "vite build",
+    "prebuild": "node scripts/copy-ocr.mjs",
     "preview": "vite preview",
-    "test": "node --test test/lib.test.js"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
-    "preact": "10.29.8"
+    "@tesseract.js-data/eng": "1.0.0",
+    "preact": "10.29.8",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "2.10.6",

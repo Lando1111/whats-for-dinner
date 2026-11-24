@@ -5,6 +5,7 @@ import { formatQty } from '../lib/units.js';
 import { supabase, friendly } from '../lib/supabase.js';
 import { go, back } from '../lib/router.js';
 import { Icon } from '../icons.jsx';
+import { PhotoImport } from './PhotoImport.jsx';
 
 const blankLine = () => ({ quantity: '', unit: '', name: '', note: '', ok: true });
 const qtyText = (q) => (q == null || q === '' ? '' : typeof q === 'number' ? formatQty(q) : q);
@@ -40,6 +41,9 @@ function Form({ existing, household, say }) {
   const fileRef = useRef();
   const [link, setLink] = useState('');
   const [importing, setImporting] = useState(false);
+  const pageRef = useRef();
+  const [pageFile, setPageFile] = useState(null);
+  const [previews, setPreviews] = useState(null);
 
   async function importLink(url) {
     setImporting(true);
@@ -63,6 +67,27 @@ function Form({ existing, household, say }) {
     setLink('');
     const flagged = parsed.filter((p) => !p.ok).length;
     say(`Imported from ${data.site}. Check the measurements${flagged ? ` and the ${flagged} highlighted lines` : ''}, then save.`);
+  }
+
+  function applyPhoto(res) {
+    setPageFile(null);
+    const parsed = parseIngredients(res.ingredients.join('\n')).map((p) => ({ ...p, quantity: qtyText(p.quantity), unit: p.unit || '', note: p.note || '' }));
+    const keep = lines.filter((l) => l.name.trim());
+    if (parsed.length) setLines([...keep, ...parsed]);
+    if (res.method.length) setMethod((m) => [m.trim(), ...res.method].filter(Boolean).join('\n'));
+    setR((cur) => ({
+      ...cur,
+      title: cur.title || res.title,
+      servings: res.servings || cur.servings,
+      measure_system: res.system,
+      protein: cur.protein || (parsed.length ? guessProtein([...keep, ...parsed].map((x) => x.name)) : null)
+    }));
+    if (res.dish) setPhoto(new File([res.dish], 'from-page.jpg', { type: 'image/jpeg' }));
+    setPreviews(res.previews);
+    const flagged = parsed.filter((p) => !p.ok).length;
+    say(parsed.length
+      ? `Read ${parsed.length} ingredients${res.method.length ? ` and ${res.method.length} steps` : ''}. Check them against the photo${flagged ? `, especially the ${flagged} highlighted` : ''}.`
+      : "Couldn't find ingredients in that box. Try again with the page flatter, or type them in.", !parsed.length);
   }
 
   useEffect(() => {
@@ -129,9 +154,13 @@ function Form({ existing, household, say }) {
             <input id="link" class="field" type="url" inputmode="url" placeholder="Paste a recipe link" value={link} onInput={(e) => setLink(e.currentTarget.value)} />
             <button class="btn outline" style="height:48px;padding:0 14px" disabled={!link.trim() || importing}>{importing ? 'Reading…' : 'Import'}</button>
           </div>
-          <span class="cap">{importing ? 'Reading the recipe from the website…' : 'Tip: on a recipe website, tap Share → What\'s for dinner? to do this in one step.'}</span>
+          <span class="cap">{importing ? 'Reading the recipe from the website…' : 'Tip: on a recipe website, tap Share → What\'s for Dinner? to do this in one step.'}</span>
+          <input ref={pageRef} type="file" accept="image/*" class="sr" aria-label="Choose a photo of a recipe" onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (f) setPageFile(f); }} />
+          <button type="button" class="btn outline" style="height:48px" onClick={() => pageRef.current.click()}><Icon name="camera" size={20} />Read a recipe from a photo</button>
+          <span class="cap">From a cookbook or recipe card. The text is read on this phone.</span>
         </form>
       )}
+      {pageFile && <PhotoImport file={pageFile} onDone={applyPhoto} onCancel={() => setPageFile(null)} />}
 
       <form id="rf" onSubmit={save} style="display:flex;flex-direction:column;gap:16px">
         <div>
@@ -142,7 +171,7 @@ function Form({ existing, household, say }) {
         <div class="row-head" style="gap:12px">
           <input ref={fileRef} type="file" accept="image/*" class="sr" aria-label="Choose a photo" onChange={(e) => { setPhoto(e.currentTarget.files?.[0] || null); }} />
           <button type="button" class="btn outline" style="height:44px;font-size:14px" onClick={() => fileRef.current.click()}><Icon name="camera" size={20} />{photo ? 'Change photo' : existing?.photo_path ? 'Change photo' : 'Add a photo'}</button>
-          <span class="cap">{photo ? (photo.name === 'from-website' ? "Using the website's photo" : 'Photo chosen') : 'Optional. Take one or pick from your gallery.'}</span>
+          <span class="cap">{photo ? (photo.name === 'from-website' ? "Using the website's photo" : photo.name === 'from-page.jpg' ? 'Using the picture from the page' : 'Photo chosen') : 'Optional. Take one or pick from your gallery.'}</span>
         </div>
 
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
@@ -169,6 +198,12 @@ function Form({ existing, household, say }) {
             <h2 class="lbl" style="margin:0">Ingredients</h2>
             <button type="button" class="link" onClick={() => setPaste(paste === null ? '' : null)}>{paste === null ? 'Paste a list' : 'Cancel paste'}</button>
           </div>
+          {previews?.ingredients?.length > 0 && (
+            <details class="card compare" open>
+              <summary>Compare with the photo</summary>
+              {previews.ingredients.map((u, i) => <img src={u} alt={`Ingredients from the photo, part ${i + 1}`} />)}
+            </details>
+          )}
           {paste !== null && (
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
               <label class="sr" for="paste">Paste ingredients</label>
@@ -180,8 +215,8 @@ function Form({ existing, household, say }) {
             <div class="ing-row cap" aria-hidden="true"><span>Amount</span><span>Unit</span><span>Ingredient, note</span><span /></div>
             {lines.map((l, i) => (
               <div class={`ing-row${l.ok === false ? ' flag' : ''}`}>
-                <input class="field sm" aria-label="Amount" inputmode="decimal" value={l.quantity} onInput={(e) => setLine(i, 'quantity', e.currentTarget.value)} placeholder="1½" />
-                <input class="field sm" aria-label="Unit" value={l.unit} onInput={(e) => setLine(i, 'unit', e.currentTarget.value)} placeholder="cup" />
+                <input class="field sm" aria-label="Amount" inputmode="decimal" value={l.quantity} onInput={(e) => setLine(i, 'quantity', e.currentTarget.value)} placeholder={l.name ? '' : '1½'} />
+                <input class="field sm" aria-label="Unit" value={l.unit} onInput={(e) => setLine(i, 'unit', e.currentTarget.value)} placeholder={l.name ? '' : 'cup'} />
                 <input class="field sm" aria-label="Ingredient" value={l.note ? `${l.name}, ${l.note}` : l.name}
                   onInput={(e) => { const v = e.currentTarget.value; const c = v.indexOf(','); setLines(lines.map((x, j) => (j === i ? { ...x, name: c > 0 ? v.slice(0, c).trim() : v, note: c > 0 ? v.slice(c + 1).trim() : '', ok: true } : x))); }}
                   placeholder="plain flour, sifted" />
@@ -195,6 +230,12 @@ function Form({ existing, household, say }) {
 
         <div>
           <label class="lbl" for="m">Method</label>
+          {previews?.method?.length > 0 && (
+            <details class="card compare">
+              <summary>Compare with the photo</summary>
+              {previews.method.map((u, i) => <img src={u} alt={`Method from the photo, part ${i + 1}`} />)}
+            </details>
+          )}
           <textarea id="m" class="field area" rows={6} value={method} onInput={(e) => setMethod(e.currentTarget.value)} placeholder={'One step per line'} />
         </div>
 

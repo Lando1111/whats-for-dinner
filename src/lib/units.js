@@ -113,10 +113,10 @@ export function unitLabel(unit, q = 1) {
 function tidyMetric(q, base) {
   if (base === 'g') {
     if (q >= 1000) return { q: roundTo(q / 1000, 0.05), unit: 'kg', exact: true };
-    return { q: q < 20 ? Math.round(q) : q < 100 ? roundTo(q, 5) : roundTo(q, 10), unit: 'g', exact: true };
+    return { q: q < 20 ? Math.round(q) : q < 300 ? roundTo(q, 5) : roundTo(q, 10), unit: 'g', exact: true };
   }
   if (q >= 1000) return { q: roundTo(q / 1000, 0.05), unit: 'l', exact: true };
-  return { q: q < 20 ? Math.round(q) : q < 100 ? roundTo(q, 5) : roundTo(q, 10), unit: 'ml', exact: true };
+  return { q: q < 20 ? Math.round(q) : q < 300 ? roundTo(q, 5) : roundTo(q, 10), unit: 'ml', exact: true };
 }
 
 function spoons(ml) {

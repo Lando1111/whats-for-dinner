@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { useRecipes, usePhotoUrls, setRecipePhoto, seasonsText, PROTEIN_LABEL, isoDate } from '../lib/data.js';
+import { useRecipes, usePhotoUrls, setRecipePhoto, seasonsText, PROTEIN_LABEL, MEAL_TYPE_LABEL, isDinner, EXTRAS_NAME, isoDate } from '../lib/data.js';
 import { convertLine, formatAmount, formatOriginal, fahrenheitToCelsius } from '../lib/units.js';
-import { loadPlan, planRecipe } from '../lib/plan.js';
+import { loadPlan, planRecipe, addExtra, mondayOf } from '../lib/plan.js';
+import { ShopChecklist } from './ShopChecklist.jsx';
 import { friendly } from '../lib/supabase.js';
 import { go, back } from '../lib/router.js';
 import { Icon } from '../icons.jsx';
@@ -9,13 +10,14 @@ import { Icon } from '../icons.jsx';
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SYSTEM_TEXT = { AU: 'Australian measures', US: 'US measures', UK: 'UK measures', metric: 'metric measures' };
 
-export function Recipe({ id, household, canEdit, say }) {
+export function Recipe({ id, household, canEdit, say, userId }) {
   const recipes = useRecipes();
   const recipe = recipes?.find((r) => r.id === id);
   const [doubled, setDoubled] = useState(false);
   const [original, setOriginal] = useState(false);
   const [showMethod, setShowMethod] = useState(true);
   const [planning, setPlanning] = useState(false);
+  const [shopping, setShopping] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef();
   const urls = usePhotoUrls([recipe?.photo_path]);
@@ -59,6 +61,7 @@ export function Recipe({ id, household, canEdit, say }) {
           <button class="x2" aria-pressed={doubled ? 'true' : 'false'} aria-label="Double the recipe" onClick={() => setDoubled(!doubled)}>{doubled ? '×2 on' : '×2'}</button>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px">
+          {!isDinner(recipe) && <span class="chip big" style="background:var(--apricot);color:var(--on-ap)">{MEAL_TYPE_LABEL[recipe.meal_type]}</span>}
           {recipe.protein && <span class="chip big" style="background:var(--sage)">{PROTEIN_LABEL[recipe.protein]}</span>}
           {recipe.makes_leftovers && <span class="chip big" style="background:var(--butter)">Makes leftovers</span>}
           {recipe.easy_fun && <span class="chip big" style="background:var(--butter)">Easy / fun</span>}
@@ -88,6 +91,9 @@ export function Recipe({ id, household, canEdit, say }) {
           })}
           {recipe.ingredients.length === 0 && <li class="cap">No ingredients yet.</li>}
         </ul>
+        {recipe.ingredients.length > 0 && (
+          <button class="btn outline block" style="height:48px;font-size:15px" onClick={() => setShopping(true)}><Icon name="cart" size={20} />Add ingredients to shopping list{doubled ? ' (×2)' : ''}</button>
+        )}
 
         {recipe.method.length > 0 && (
           <section>
@@ -105,10 +111,20 @@ export function Recipe({ id, household, canEdit, say }) {
       {canEdit && (
         <div class="footer-bar">
           <a class="icon-btn" href={`#/recipe/${recipe.id}/edit`} aria-label="Edit recipe" style="border:2px solid var(--ls);width:52px;height:52px"><Icon name="edit" /></a>
-          <button class="btn" style="flex:1" onClick={() => setPlanning(true)}><Icon name="week" />Plan for a night</button>
+          <button class="btn" style="flex:1" onClick={() => setPlanning(true)}><Icon name="week" />{isDinner(recipe) ? 'Add to the week' : `Add to ${EXTRAS_NAME.toLowerCase()}`}</button>
         </div>
       )}
       {planning && <PlanSheet recipe={recipe} household={household} doubled={doubled} say={say} onClose={() => setPlanning(false)} />}
+      {shopping && (
+        <div class="scrim" onClick={(e) => e.target === e.currentTarget && setShopping(false)}>
+          <section class="sheet" role="dialog" aria-label="Add ingredients to shopping list">
+            <div class="handle" />
+            <div class="row-head"><h2 style="margin:0;font:600 22px/28px var(--display)">What are you missing?</h2><button class="icon-btn" style="margin-left:auto" aria-label="Close" onClick={() => setShopping(false)}><Icon name="close" /></button></div>
+            <span class="cap">{recipe.title}{doubled ? ' · doubled (×2)' : ''}. Tick what you need to buy.</span>
+            <ShopChecklist sources={[{ recipe_id: recipe.id, multiplier: mult }]} household={household} userId={userId} say={say} sticky={false} onDone={() => setShopping(false)} />
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -122,6 +138,27 @@ function PlanSheet({ recipe, household, doubled, say, onClose }) {
   const nameOf = (rid) => recipes.find((r) => r.id === rid)?.title || 'a recipe';
 
   useEffect(() => { loadPlan(from, to).then(setPlan).catch((e) => say(friendly(e), true)); }, [from, to]);
+
+  async function addAsExtra(weeksAhead) {
+    const monday = mondayOf(); monday.setDate(monday.getDate() + weeksAhead * 7);
+    try {
+      await addExtra(household.id, isoDate(monday), recipe.id, doubled ? 2 : 1);
+      say(`${recipe.title} added to ${weeksAhead ? "next week's" : "this week's"} extras`);
+      onClose();
+      go(weeksAhead ? 'week' : 'week');
+    } catch (e) { say(friendly(e), true); }
+  }
+
+  const extrasBlock = (
+    <div class="card" style="padding:12px;display:flex;flex-direction:column;gap:8px">
+      <span style="font-weight:700">As an extra</span>
+      <span class="cap">For baking, overnight oats and other non-dinners. Doesn't use a dinner night; its ingredients go into Build list.</span>
+      <div class="grid2" style="gap:8px">
+        <button class="btn outline" style="height:44px;font-size:14px" onClick={() => addAsExtra(0)}>This week</button>
+        <button class="btn outline" style="height:44px;font-size:14px" onClick={() => addAsExtra(1)}>Next week</button>
+      </div>
+    </div>
+  );
 
   async function choose(d) {
     const date = isoDate(d);
@@ -140,8 +177,10 @@ function PlanSheet({ recipe, household, doubled, say, onClose }) {
     <div class="scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <section class="sheet" role="dialog" aria-label="Plan for a night">
         <div class="handle" />
-        <div class="row-head"><h2 style="margin:0;font:600 22px/28px var(--display)">Which night?</h2><button class="icon-btn" style="margin-left:auto" aria-label="Close" onClick={onClose}><Icon name="close" /></button></div>
-        {doubled && <span class="cap">It'll be planned doubled (×2).</span>}
+        <div class="row-head"><h2 style="margin:0;font:600 22px/28px var(--display)">Add to the week</h2><button class="icon-btn" style="margin-left:auto" aria-label="Close" onClick={onClose}><Icon name="close" /></button></div>
+        {doubled && <span class="cap">It'll be added doubled (×2).</span>}
+        {!isDinner(recipe) && extrasBlock}
+        <span style="font-weight:700">{isDinner(recipe) ? 'As dinner on a night' : 'Or as dinner on a night'}</span>
         {!plan ? <p class="cap">Loading…</p> : (
           <div style="display:flex;flex-direction:column;overflow-y:auto">
             {days.map((d, i) => {
@@ -156,6 +195,7 @@ function PlanSheet({ recipe, household, doubled, say, onClose }) {
             })}
           </div>
         )}
+        {isDinner(recipe) && extrasBlock}
       </section>
     </div>
   );

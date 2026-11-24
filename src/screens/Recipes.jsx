@@ -1,25 +1,29 @@
 import { useMemo, useState } from 'preact/hooks';
-import { useRecipes, usePhotoUrls, inSeason, seasonNow, PROTEIN_LABEL } from '../lib/data.js';
+import { useRecipes, usePhotoUrls, inSeason, seasonNow, PROTEIN_LABEL, MEAL_TYPE_LABEL, isDinner } from '../lib/data.js';
 import { Icon } from '../icons.jsx';
 
 const FILTERS = [
   ['all', 'All'],
+  ['dinner', 'Dinners'],
+  ['extras', 'Baking & extras'],
   ['season', 'In season'],
   ['vegetarian', 'Vegetarian'],
   ['easy', 'Easy / fun'],
   ['leftovers', 'Leftovers']
 ];
 
-export function Recipes({ canEdit, pick, onPick }) {
+export function Recipes({ canEdit, pick, onPick, startFilter = 'all', title }) {
   const recipes = useRecipes();
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(startFilter);
   const season = seasonNow();
 
   const shown = useMemo(() => {
     if (!recipes) return [];
     const needle = q.trim().toLowerCase();
     return recipes.filter((r) => {
+      if (filter === 'dinner' && !isDinner(r)) return false;
+      if (filter === 'extras' && isDinner(r)) return false;
       if (filter === 'season' && !inSeason(r, season)) return false;
       if (filter === 'vegetarian' && r.protein !== 'vegetarian') return false;
       if (filter === 'easy' && !r.easy_fun) return false;
@@ -35,7 +39,7 @@ export function Recipes({ canEdit, pick, onPick }) {
     <main class="main" style={pick ? 'padding-bottom:24px' : ''}>
       <header class="row-head">
         {pick && <button class="icon-btn" aria-label="Close" style="margin-left:-10px" onClick={() => onPick(null)}><Icon name="close" /></button>}
-        <h1 class="title">{pick ? 'Pick a recipe' : 'Recipes'}</h1>
+        <h1 class="title">{title || (pick ? 'Pick a recipe' : 'Recipes')}</h1>
         {!pick && canEdit && <a class="btn" href="#/recipe/new" style="margin-left:auto;height:44px;padding:0 16px;font-size:15px"><Icon name="plus" size={20} stroke={2.4} />Add recipe</a>}
       </header>
 
@@ -71,6 +75,7 @@ export function Recipes({ canEdit, pick, onPick }) {
                   <span style="display:flex;flex-direction:column;gap:4px;min-width:0;text-align:left">
                     <span style="font-weight:700;line-height:20px">{r.title}</span>
                     <span style="display:flex;gap:6px;flex-wrap:wrap">
+                      {!isDinner(r) && <span class="chip" style="background:var(--apricot);color:var(--on-ap)">{MEAL_TYPE_LABEL[r.meal_type]}</span>}
                       {r.protein && <span class="chip" style="background:var(--sage)">{PROTEIN_LABEL[r.protein]}</span>}
                       {r.easy_fun && <span class="chip" style="background:var(--butter)">Easy / fun</span>}
                       {r.makes_leftovers && <span class="chip" style="background:var(--butter)">Leftovers</span>}

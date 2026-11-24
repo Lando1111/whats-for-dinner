@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { supabase, friendly } from '../lib/supabase.js';
-import { useRecipes, usePhotoUrls, isoDate, fromIso } from '../lib/data.js';
-import { loadPlan, planRecipe, clearNight, updateNight, upsertNight, setLeftoverNights, pickRecipe, planFill, weekDatesFrom } from '../lib/plan.js';
+import { useRecipes, usePhotoUrls, isoDate, fromIso, EXTRAS_NAME } from '../lib/data.js';
+import { loadPlan, planRecipe, clearNight, updateNight, upsertNight, setLeftoverNights, pickRecipe, planFill, weekDatesFrom, loadExtras, addExtra, updateExtra, removeExtra } from '../lib/plan.js';
 import { Recipes } from './Recipes.jsx';
 import { Icon } from '../icons.jsx';
 
@@ -26,6 +26,8 @@ export function Week({ household, member, say }) {
   const [recent, setRecent] = useState([]);
   const [open, setOpen] = useState(null); // date iso
   const [busy, setBusy] = useState(false);
+  const [extras, setExtras] = useState([]);
+  const [pickingExtra, setPickingExtra] = useState(false);
 
   const start = weekStart(offset);
   const dates = weekDatesFrom(start);
@@ -38,6 +40,7 @@ export function Week({ household, member, say }) {
       const rows = await loadPlan(isoDate(from), dates[6]);
       setPlan(rows.filter((r) => r.date >= dates[0]));
       setRecent(rows.filter((r) => r.date < dates[0] && r.recipe_id).map((r) => r.recipe_id));
+      setExtras(await loadExtras(dates[0]));
     } catch (e) { say(friendly(e), true); }
   }, [dates[0], repeatWeeks]);
 
@@ -47,13 +50,15 @@ export function Week({ household, member, say }) {
   useEffect(() => {
     const ch = supabase.channel(`plan-${household.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_plan', filter: `household_id=eq.${household.id}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'week_extras', filter: `household_id=eq.${household.id}` }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [household.id, load]);
 
   const byDate = useMemo(() => Object.fromEntries(plan.map((p) => [p.date, p])), [plan]);
   const rById = useMemo(() => Object.fromEntries((recipes || []).map((r) => [r.id, r])), [recipes]);
-  const urls = usePhotoUrls(plan.map((p) => rById[p.recipe_id]?.photo_path));
+  const urls = usePhotoUrls([...plan, ...extras].map((p) => rById[p.recipe_id]?.photo_path));
+  const extraRun = async (fn) => { try { await fn(); await load(); } catch (e) { say(friendly(e), true); } };
 
   async function fill() {
     if (!recipes?.length) return say('Add some recipes first.', true);
@@ -122,6 +127,43 @@ export function Week({ household, member, say }) {
         </button>
       </div>
 
+      <section>
+        <div class="row-head">
+          <h2 style="margin:0;font-size:18px;line-height:24px">{EXTRAS_NAME}</h2>
+          {canEdit && <button class="link" style="margin-left:auto" onClick={() => setPickingExtra(true)}>+ Add</button>}
+        </div>
+        {extras.length ? (
+          <ul class="card shop">
+            {extras.map((x) => {
+              const r = rById[x.recipe_id];
+              const photo = r?.photo_path && urls[r.photo_path];
+              return (
+                <li>
+                  {photo ? <img class="thumb" style="width:44px;height:44px" src={photo} alt="" /> : <span class="thumb" style="width:44px;height:44px;background:var(--butter);display:flex;align-items:center;justify-content:center"><Icon name="bowl" size={20} /></span>}
+                  <a class="shop-text" href={`#/recipe/${x.recipe_id}`} style="text-decoration:none;color:var(--ink)"><span class="nm" style="font-weight:700">{r?.title || 'Recipe removed'}</span></a>
+                  {canEdit ? (
+                    <>
+                      <button class="x2" style="height:40px;min-width:52px;font-size:16px" aria-pressed={x.multiplier === 2 ? 'true' : 'false'} aria-label={`Double ${r?.title || 'it'}`} onClick={() => extraRun(() => updateExtra(x.id, { multiplier: x.multiplier === 2 ? 1 : 2 }))}>×2</button>
+                      <button class="icon-btn" aria-label={`Remove ${r?.title || 'extra'}`} onClick={() => extraRun(() => removeExtra(x.id))}><Icon name="close" size={18} /></button>
+                    </>
+                  ) : x.multiplier === 2 ? <span class="qty">×2</span> : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p class="cap" style="margin:0">Baking, overnight oats and other non-dinners for this week. They don't use a dinner night, and Build list adds their ingredients.</p>
+        )}
+      </section>
+
+      {pickingExtra && (
+        <div class="scrim">
+          <section class="sheet full" role="dialog" aria-label="Pick an extra">
+            <Recipes pick startFilter="extras" title={`Add to ${EXTRAS_NAME.toLowerCase()}`} onPick={(r) => { setPickingExtra(false); if (r) extraRun(() => addExtra(household.id, dates[0], r.id)); }} />
+          </section>
+        </div>
+      )}
+
       {open && (
         <NightSheet
           date={open} plan={plan} recipes={recipes || []} household={household} say={say} recent={recent}
@@ -183,7 +225,7 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
     <div class="scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       {picking ? (
         <section class="sheet full" role="dialog" aria-label="Pick a recipe">
-          <Recipes pick onPick={(r) => { setPicking(false); if (r) choose(r); }} />
+          <Recipes pick startFilter="dinner" onPick={(r) => { setPicking(false); if (r) choose(r); }} />
         </section>
       ) : (
         <section class="sheet" role="dialog" aria-label={`${LONG[d.getDay()]} ${d.getDate()}`}>

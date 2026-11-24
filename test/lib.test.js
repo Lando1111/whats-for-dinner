@@ -42,7 +42,8 @@ test('conversion: AU defaults', () => {
 });
 
 test('conversion: US recipes', () => {
-  assert.equal(conv({ quantity: 1, unit: 'cup', name: 'beef stock' }, { system: 'US' }), '240 ml');
+  assert.equal(conv({ quantity: 1, unit: 'cup', name: 'beef stock' }, { system: 'US' }), '235 ml');
+  assert.equal(conv({ quantity: 0.5, unit: 'cup', name: 'greek yoghurt' }), '125 ml');
   assert.equal(conv({ quantity: 2, unit: 'tbsp', name: 'chilli powder' }, { system: 'US' }), '1½ tbsp');
   assert.equal(conv({ quantity: 1, unit: 'lb', name: 'chicken thighs' }, { system: 'US' }), '450 g');
   assert.equal(conv({ quantity: 1, unit: 'cup', name: 'white sugar' }, { system: 'US' }), '210 g');

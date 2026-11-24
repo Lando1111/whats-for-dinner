@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { useRecipes, saveRecipe, deleteRecipe, setRecipePhoto, SEASON_LIST, PROTEINS } from '../lib/data.js';
+import { useRecipes, saveRecipe, deleteRecipe, setRecipePhoto, SEASON_LIST, PROTEINS, MEAL_TYPES, EXTRAS_NAME } from '../lib/data.js';
 import { parseIngredients, parseMethod, splitRecipeText, guessProtein } from '../lib/parse.js';
 import { formatQty } from '../lib/units.js';
 import { supabase, friendly } from '../lib/supabase.js';
@@ -22,6 +22,7 @@ function Form({ existing, household, say }) {
     title: existing?.title || '',
     servings: existing?.servings || 4,
     measure_system: existing?.measure_system || 'AU',
+    meal_type: existing?.meal_type || 'dinner',
     protein: existing?.protein || null,
     seasons: existing?.seasons || ['all'],
     easy_fun: existing?.easy_fun || false,
@@ -198,7 +199,12 @@ function Form({ existing, household, say }) {
         </div>
 
         <section style="display:flex;flex-direction:column;gap:8px">
-          <h2 class="lbl" style="margin:0">Protein</h2>
+          <h2 class="lbl" style="margin:0">Type</h2>
+          <div class="chips">
+            {MEAL_TYPES.map(([v, l]) => <button type="button" class="chipbtn" aria-pressed={r.meal_type === v ? 'true' : 'false'} onClick={() => set('meal_type', v)}>{l}</button>)}
+          </div>
+          <span class="cap">Only dinners are used by Fill the week. The rest can go in {EXTRAS_NAME.toLowerCase()}.</span>
+          <h2 class="lbl" style="margin:8px 0 0">Protein</h2>
           <div class="chips">
             {PROTEINS.map(([v, l]) => <button type="button" class="chipbtn sage" aria-pressed={r.protein === v ? 'true' : 'false'} onClick={() => set('protein', r.protein === v ? null : v)}>{l}</button>)}
           </div>

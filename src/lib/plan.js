@@ -1,6 +1,6 @@
 // Week plan: reading and writing nights, leftovers, and the random picker.
 import { supabase } from './supabase.js';
-import { isoDate, fromIso, inSeason, seasonNow } from './data.js';
+import { isoDate, fromIso, inSeason, seasonNow, isDinner } from './data.js';
 
 export async function loadPlan(fromIso, toIso) {
   const { data, error } = await supabase.from('meal_plan').select('*').gte('date', fromIso).lte('date', toIso).order('date');
@@ -63,6 +63,7 @@ const shuffle = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--
  */
 export function pickRecipe(recipes, { date, avoid = new Set(), needLeftovers = false, wantVeg = false } = {}) {
   const season = seasonNow(date ? fromIso(date) : new Date());
+  recipes = recipes.filter(isDinner);
   let pool = recipes.filter((r) => (!needLeftovers || r.makes_leftovers) && (!wantVeg || r.protein === 'vegetarian'));
   if (!pool.length && needLeftovers) pool = recipes.filter((r) => !wantVeg || r.protein === 'vegetarian');
   if (!pool.length) pool = recipes;
@@ -80,6 +81,7 @@ export function pickRecipe(recipes, { date, avoid = new Set(), needLeftovers = f
  * Returns [{ date, recipe }] to save. Respects leftover weekdays, no-repeat weeks and minimum vegetarian nights.
  */
 export function planFill({ recipes, weekDates, plan, recent, settings }) {
+  recipes = recipes.filter(isDinner);
   const leftoverDays = settings?.leftover_weekdays || [];
   const minVeg = settings?.min_veg_nights || 0;
   const byDate = Object.fromEntries(plan.map((p) => [p.date, p]));
@@ -106,4 +108,27 @@ export function planFill({ recipes, weekDates, plan, recent, settings }) {
 
 export function weekDatesFrom(start) {
   return Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return isoDate(d); });
+}
+
+// ---------- extras: non-dinner recipes for the week (baking, overnight oats…) ----------
+export async function loadExtras(weekStartIso) {
+  const { data, error } = await supabase.from('week_extras').select('*').eq('week_start', weekStartIso).order('created_at');
+  if (error) throw error;
+  return data;
+}
+export async function addExtra(householdId, weekStartIso, recipeId, multiplier = 1) {
+  const { error } = await supabase.from('week_extras').insert({ household_id: householdId, week_start: weekStartIso, recipe_id: recipeId, multiplier });
+  if (error) throw error;
+}
+export async function updateExtra(id, fields) {
+  const { error } = await supabase.from('week_extras').update(fields).eq('id', id);
+  if (error) throw error;
+}
+export async function removeExtra(id) {
+  const { error } = await supabase.from('week_extras').delete().eq('id', id);
+  if (error) throw error;
+}
+// Monday of the week containing a date.
+export function mondayOf(d = new Date()) {
+  const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x;
 }

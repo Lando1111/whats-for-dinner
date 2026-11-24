@@ -48,6 +48,7 @@ export async function saveRecipe(recipe, lines, householdId) {
     easy_fun: !!recipe.easy_fun,
     makes_leftovers: !!recipe.makes_leftovers,
     measure_system: recipe.measure_system || 'AU',
+    meal_type: recipe.meal_type || 'dinner',
     source_url: recipe.source_url || null,
     source_note: recipe.source_note || null
   };
@@ -140,6 +141,11 @@ export function usePhotoUrls(paths) {
 export const SEASON_LIST = [['summer', 'Summer'], ['autumn', 'Autumn'], ['winter', 'Winter'], ['spring', 'Spring'], ['all', 'All year']];
 export const PROTEINS = [['beef', 'Beef'], ['chicken', 'Chicken'], ['lamb', 'Lamb'], ['pork', 'Pork'], ['fish', 'Fish & seafood'], ['vegetarian', 'Vegetarian']];
 export const PROTEIN_LABEL = Object.fromEntries(PROTEINS);
+export const MEAL_TYPES = [['dinner', 'Dinner'], ['baking', 'Baking'], ['breakfast', 'Breakfast'], ['snack', 'Snack'], ['dessert', 'Dessert'], ['side', 'Side']];
+export const MEAL_TYPE_LABEL = Object.fromEntries(MEAL_TYPES);
+export const isDinner = (r) => !r.meal_type || r.meal_type === 'dinner';
+// What the weekly non-dinner list is called in the app. Change here to rename it everywhere.
+export const EXTRAS_NAME = 'Extras this week';
 export function seasonNow(d = new Date()) {
   const m = d.getMonth(); // southern hemisphere
   return m === 11 || m <= 1 ? 'summer' : m <= 4 ? 'autumn' : m <= 7 ? 'winter' : 'spring';

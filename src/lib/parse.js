@@ -50,7 +50,7 @@ export function tidyLine(raw) {
   let out = '';
   let group = '';
   let depth = 0;
-  const tidyNote = (t) => t.replace(/\s+/g, ' ').replace(/(\s*,\s*)+/g, ', ').replace(/^[\s,.;:/-]+|[\s,.;:/-]+$/g, '');
+  const tidyNote = (t) => t.replace(/\s+/g, ' ').replace(/\s*\.\s+(?=[a-z])/g, ', ').replace(/(\s*,\s*)+/g, ', ').replace(/^[\s,.;:/-]+|[\s,.;:/-]+$/g, '');
   for (const ch of s) {
     if (ch === '(') { if (depth > 0) group += ', '; depth++; continue; }
     if (ch === ')') {

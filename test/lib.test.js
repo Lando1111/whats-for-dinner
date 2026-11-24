@@ -100,3 +100,22 @@ test('website lines: notes inside brackets, brackets in brackets, two units', as
   assert.equal(tidyLine('2 tsp salt &#x28;or to taste&#x29;'), '2 tsp salt (or to taste)');
   assert.equal(parseIngredient('1/2 cup flour').quantity, 0.5);
 });
+
+test('a real RecipeTin Eats ingredient list comes through clean', async () => {
+  const { parseIngredients } = await import('../src/lib/parse.js');
+  const lines = ['600 g/1.2lb   chicken breast ((or boneless thighs))', '2 cups milk (, any fat % (Note 1))', '1 cup chicken broth ((stock))',
+    '2 tsp chicken or vegetable stock powder ((Note 2))', '2  sprigs thyme (, optional)', '2  large carrots ((3 small). chopped)',
+    '50g / 3 tbsp  butter', '1/3 cup white wine ((sub more chicken stock))', '2  sheets puff pastry ((enough to cover pots, with drape))'];
+  const got = parseIngredients(lines.join('\n')).map((p) => [p.quantity, p.unit, p.name, p.note, p.ok]);
+  assert.deepEqual(got, [
+    [600, 'g', 'chicken breast', '1.2 lb, or boneless thighs', true],
+    [2, 'cup', 'milk', 'any fat %', true],
+    [1, 'cup', 'chicken broth', 'stock', true],
+    [2, 'tsp', 'chicken or vegetable stock powder', null, true],
+    [2, 'sprig', 'thyme', 'optional', true],
+    [2, null, 'large carrots', '3 small, chopped', true],
+    [50, 'g', 'butter', '3 tbsp', true],
+    [1 / 3, 'cup', 'white wine', 'sub more chicken stock', true],
+    [2, 'sheet', 'puff pastry', 'enough to cover pots, with drape', true]
+  ]);
+});

@@ -5,7 +5,12 @@ import { Icon } from './icons.jsx';
 import { SignIn } from './screens/SignIn.jsx';
 import { Onboarding } from './screens/Onboarding.jsx';
 import { Week } from './screens/Week.jsx';
-import { Placeholder } from './screens/Placeholder.jsx';
+import { Recipes } from './screens/Recipes.jsx';
+import { Recipe } from './screens/Recipe.jsx';
+import { RecipeEdit } from './screens/RecipeEdit.jsx';
+import { Shopping } from './screens/Shopping.jsx';
+import { Build } from './screens/Build.jsx';
+import { clearRecipeCache } from './lib/data.js';
 import { Settings } from './screens/Settings.jsx';
 import { Household } from './screens/Household.jsx';
 
@@ -67,17 +72,22 @@ export function App() {
     screen = <Onboarding say={say} invite={readInvite()} onDone={() => { clearInvite(); loadMember(); go('week'); }} onDropInvite={() => { clearInvite(); loadMember(); }} />;
   } else {
     const props = { member, household: member.households, reload: loadMember, say, userId };
+    const canEdit = member.role !== 'shopping';
     const name = route.name === 'join' ? 'week' : route.name;
     if (route.name === 'join') { clearInvite(); }
     if (name === 'settings') screen = <Settings {...props} />;
     else if (name === 'household') screen = <Household {...props} />;
-    else if (name === 'shopping') screen = <Placeholder title="Shopping list" text="The shared shopping list arrives in a coming build." />;
-    else if (name === 'recipes') screen = <Placeholder title="Recipes" text="Adding and importing recipes arrives in the next build." />;
+    else if (name === 'shopping') screen = <Shopping {...props} />;
+    else if (name === 'build' && canEdit) screen = <Build {...props} start={route.param} />;
+    else if (name === 'recipes') screen = <Recipes canEdit={canEdit} />;
+    else if (name === 'recipe' && (route.param === 'new' || route.sub === 'edit') && canEdit) screen = <RecipeEdit {...props} id={route.param} />;
+    else if (name === 'recipe' && route.param) screen = <Recipe {...props} id={route.param} canEdit={canEdit} />;
     else screen = <Week {...props} />;
   }
 
-  const showTabs = session && member;
+  const showTabs = session && member && !['recipe', 'build'].includes(route.name);
   const current = route.name === 'household' ? 'settings' : route.name;
+  useEffect(() => { if (!session) clearRecipeCache(); }, [session]);
   return (
     <div class="app">
       {screen}

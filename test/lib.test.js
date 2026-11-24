@@ -81,3 +81,22 @@ test('protein guess', () => {
   assert.equal(guessProtein(['rice', 'frozen peas', 'eggs']), 'vegetarian');
   assert.equal(guessProtein(['hamburger buns', 'mushrooms']), 'vegetarian');
 });
+
+test('website lines: notes inside brackets, brackets in brackets, two units', async () => {
+  const { parseIngredient, tidyLine } = await import('../src/lib/parse.js');
+  const cases = [
+    ['600 g/1.2lb chicken breast ((or thigh))', 600, 'g', 'chicken breast', '1.2 lb, or thigh'],
+    ['2 cups milk (, any fat % (Note 1))', 2, 'cup', 'milk', 'any fat %'],
+    ['2 sprigs thyme (, optional)', 2, 'sprig', 'thyme', 'optional'],
+    ['1 large onion (, chopped)', 1, null, 'large onion', 'chopped'],
+    ['1.2lb/600g chicken thigh', 600, 'g', 'chicken thigh', '1.2 lb'],
+    ['500ml / 2 cups stock', 500, 'ml', 'stock', '2 cups'],
+    ['1 sheet puff pastry (, thawed (Note 3))', 1, 'sheet', 'puff pastry', 'thawed']
+  ];
+  for (const [line, q, u, name, note] of cases) {
+    const p = parseIngredient(line);
+    assert.deepEqual([p.quantity, p.unit, p.name, p.note, p.ok], [q, u, name, note, true], line);
+  }
+  assert.equal(tidyLine('2 tsp salt &#x28;or to taste&#x29;'), '2 tsp salt (or to taste)');
+  assert.equal(parseIngredient('1/2 cup flour').quantity, 0.5);
+});

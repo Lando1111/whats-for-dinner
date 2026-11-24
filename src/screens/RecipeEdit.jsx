@@ -11,6 +11,20 @@ import { PickPhoto } from '../PickPhoto.jsx';
 const blankLine = () => ({ quantity: '', unit: '', name: '', note: '', ok: true });
 const qtyText = (q) => (q == null || q === '' ? '' : typeof q === 'number' ? formatQty(q) : q);
 
+// Which measuring system a recipe website uses. Australian sites (.au) use 250 ml cups and 20 ml tablespoons;
+// RecipeTin Eats and most international sites use 250 ml cups and 15 ml tablespoons ("metric").
+// US only with clear US signs; the person can change it on the form.
+const SITE_SYSTEMS = { 'recipetineats.com': 'metric', 'bbcgoodfood.com': 'UK', 'jamieoliver.com': 'UK', 'allrecipes.com': 'US', 'foodnetwork.com': 'US', 'seriouseats.com': 'US', 'nytimes.com': 'US', 'bonappetit.com': 'US' };
+function siteSystem(site = '', text = '') {
+  const host = site.replace(/^www\./, '');
+  const known = Object.entries(SITE_SYSTEMS).find(([d]) => host === d || host.endsWith(`.${d}`));
+  if (known) return known[1];
+  if (/\.au$/.test(host)) return 'AU';
+  if (/\.uk$/.test(host)) return 'UK';
+  if (/\b(\d+\s*-?\s*ounces?|oz|pounds?|lbs?|quarts?|pints?|sticks? of butter)\b|°\s?F\b/i.test(text)) return 'US';
+  return 'metric';
+}
+
 export function RecipeEdit({ id, household, say }) {
   const recipes = useRecipes();
   const existing = id && id !== 'new' ? recipes?.find((r) => r.id === id) : null;
@@ -57,7 +71,7 @@ function Form({ existing, household, say }) {
     }
     const parsed = parseIngredients((data.ingredients || []).join('\n')).map((p) => ({ ...p, quantity: qtyText(p.quantity), unit: p.unit || '', note: p.note || '' }));
     const text = (data.ingredients || []).join(' ');
-    const measure = /\.au$/.test(data.site) ? 'AU' : /\.uk$/.test(data.site) ? 'UK' : /\b(cups?|tbsp|tsp|oz|lbs?|tablespoons?|teaspoons?)\b/i.test(text) ? 'US' : 'metric';
+    const measure = siteSystem(data.site, text);
     setR((cur) => ({ ...cur, protein: cur.protein || (parsed.length ? guessProtein(parsed.map((x) => x.name)) : null), title: data.title || cur.title, servings: data.servings || cur.servings, source_url: data.source_url, source_note: data.site, measure_system: measure }));
     if (parsed.length) setLines(parsed);
     if (data.method?.length) setMethod(data.method.join('\n'));

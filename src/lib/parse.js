@@ -34,8 +34,60 @@ const METRIC_GLUE = /^(?:g|gm|gms|kg|kgs|ml|mls|l|lb|lbs|oz)$/i;
  * "? cup oil" (amount unreadable in a photo) → no amount, flagged.
  * ok = false when the line looks odd and should be checked by a person.
  */
+/**
+ * Tidy a line from a recipe website (or pasted from one): HTML entities, brackets inside brackets,
+ * notes like "(, chopped)" or "((or thigh))", "Note 1" references, and stray commas and dots.
+ * "2 cups milk (, any fat % (Note 1))" → "2 cups milk (any fat %)"
+ */
+export function tidyLine(raw) {
+  let s = (raw || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/[[{]/g, '(').replace(/[\]}]/g, ')')
+    .replace(/\(?\s*\bnotes?\s*\d+(?:\s*(?:,|&|and)\s*\d+)*\s*\)?/gi, ' '); // "(Note 1)", "Note 2"
+  // One level of brackets: keep each top-level group, flatten anything nested inside it.
+  let out = '';
+  let group = '';
+  let depth = 0;
+  const tidyNote = (t) => t.replace(/\s+/g, ' ').replace(/(\s*,\s*)+/g, ', ').replace(/^[\s,.;:/-]+|[\s,.;:/-]+$/g, '');
+  for (const ch of s) {
+    if (ch === '(') { if (depth > 0) group += ', '; depth++; continue; }
+    if (ch === ')') {
+      if (depth === 0) continue; // a stray ")"
+      depth--;
+      if (depth === 0) { const t = tidyNote(group); if (t) out += ` (${t}) `; group = ''; }
+      continue;
+    }
+    if (depth > 0) group += ch; else out += ch;
+  }
+  if (depth > 0) { const t = tidyNote(group); if (t) out += ` (${t})`; }
+  return out
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,;)])/g, '$1')
+    .replace(/\(\s+/g, '(')
+    .replace(/,(\s*,)+/g, ',')
+    .replace(/\s\.\s/g, ', ')
+    .replace(/[,\s]+$/, '')
+    .trim();
+}
+
+// "600 g/1.2lb chicken" or "1.2lb/600g chicken": keep the metric amount, the other goes in the note.
+const METRIC_UNITS = ['g', 'kg', 'ml', 'l'];
+function pickMetric(line, notes) {
+  const m = line.match(new RegExp(`^(${NUM})\\s*([A-Za-z]+\\.?)\\s*\\/\\s*(${NUM})\\s*([A-Za-z]+\\.?)(?=[\\s,(]|$)(.*)$`));
+  if (!m) return line;
+  const u1 = normaliseUnit(m[2]); const u2 = normaliseUnit(m[4]);
+  if (!u1 || !u2) return line;
+  const firstMetric = METRIC_UNITS.includes(u1);
+  const secondMetric = METRIC_UNITS.includes(u2);
+  const [keep, other] = !firstMetric && secondMetric ? [[m[3], m[4]], [m[1], m[2]]] : [[m[1], m[2]], [m[3], m[4]]];
+  notes.push(`${other[0].trim()} ${other[1]}`);
+  return `${keep[0].trim()} ${keep[1]}${m[5]}`;
+}
+
 export function parseIngredient(raw) {
-  let line = (raw || '').replace(/^[\s•*·+»›◦▪●∙‣\-–—]+|^\s*[.,:;«‹°>]+\s+|^\d+[.)]\s+(?=\D)/, '').replace(/\s+/g, ' ').trim();
+  let line = tidyLine(raw).replace(/^[\s•*·+»›◦▪●∙‣\-–—]+|^\s*[.,:;«‹°>]+\s+|^\d+[.)]\s+(?=\D)/, '').replace(/\s+/g, ' ').trim();
   if (!line) return null;
   line = line.replace(/^\.(\d)/, '0.$1'); // ".5 cup" → "0.5 cup"
   let quantity = null;
@@ -51,6 +103,7 @@ export function parseIngredient(raw) {
 
   // "2cups rice" → "2 cups rice" (but keep "500g").
   line = line.replace(new RegExp(`^(${NUM})([A-Za-z]{2,})`), (all, n, w) => (METRIC_GLUE.test(w) ? all : `${n} ${w}`));
+  line = pickMetric(line, notes);
 
   // Brackets: close one the photo lost ("(adds depth of flavor, optional"); a stray ")" is checked by a person.
   const opens = (line.match(/\(/g) || []).length;

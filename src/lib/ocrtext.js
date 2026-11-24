@@ -7,7 +7,9 @@ const COUNT_WORDS = new Set(['large', 'medium', 'small', 'whole', 'piece', 'piec
   'heaped', 'level', 'rounded', 'scant', 'generous', 'x']);
 const startsAmountWord = (w) => w.length >= 2 && (normaliseUnit(w) || COUNT_WORDS.has(w.toLowerCase()));
 
-const BULLET = /^[\s•*·+»›◦▪●∙‣~\-–—]+(?=\S)/;
+const BULLET = /^[\s•*·+»›◦▪●∙‣~\-–—]+(?=\S)|^\s*[.,:;«‹°>]+\s+(?=\S)/;
+// A quote-like mark before a word: a misread fraction when a unit follows ("’ cup"), otherwise a misread bullet.
+const QUOTE_LEAD = /^(?:\d\s?)?[’'‘"“”`´%]+\s*(?=([A-Za-z]+))/;
 const METRIC_GLUE = /^(?:g|gm|gms|kg|kgs|ml|mls|l|lb|lbs|oz)$/i;
 
 /**
@@ -18,8 +20,10 @@ export function cleanIngredientLine(s) {
   let t = (s || '').replace(/\s+/g, ' ').trim().replace(BULLET, '');
   if (!t) return '';
 
-  // A fraction glyph read as a quote mark or percent sign: amount unknown.
-  t = t.replace(/^(?:\d\s?)?[’'‘"“”`´%]+\s*(?=[A-Za-z])/, '? ');
+  // A fraction glyph read as a quote mark or percent sign: amount unknown. Otherwise it was a bullet.
+  t = t.replace(/^[’'‘"“”`´]+\s+(?=\d)/, ''); // stray mark before an amount
+  const q = t.match(QUOTE_LEAD);
+  if (q) t = startsAmountWord(q[1]) || /^of$/i.test(q[1]) || /^\d/.test(t) ? t.replace(QUOTE_LEAD, '? ') : t.replace(QUOTE_LEAD, '');
 
   // Digit look-alikes inside an amount that has at least one real digit: "S0g" → "50g", "1O0" → "100",
   // but "2large" stays "2large" (the l belongs to the word).
@@ -55,7 +59,7 @@ export function cleanIngredientLine(s) {
   t = t.replace(/(\d) 9(?=\)|\/|$)/g, '$1 g');
 
   // Footnote marks at the end: "pasta!" "cheddar 2" "pasta ¹"
-  t = t.replace(/\s*[¹²³⁴⁵!]+$/, '');
+  t = t.replace(/\s*[¹²³⁴⁵!’'‘"”`*]+$/, '');
   if (/^[\d?¼½¾]/.test(t)) t = t.replace(/\s\d$/, '');
   return t.trim();
 }

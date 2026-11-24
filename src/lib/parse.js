@@ -35,8 +35,9 @@ const METRIC_GLUE = /^(?:g|gm|gms|kg|kgs|ml|mls|l|lb|lbs|oz)$/i;
  * ok = false when the line looks odd and should be checked by a person.
  */
 export function parseIngredient(raw) {
-  let line = (raw || '').replace(/^[\s•*·+»›◦▪●∙‣\-–—]+|^\d+[.)]\s+(?=\D)/, '').replace(/\s+/g, ' ').trim();
+  let line = (raw || '').replace(/^[\s•*·+»›◦▪●∙‣\-–—]+|^\s*[.,:;«‹°>]+\s+|^\d+[.)]\s+(?=\D)/, '').replace(/\s+/g, ' ').trim();
   if (!line) return null;
+  line = line.replace(/^\.(\d)/, '0.$1'); // ".5 cup" → "0.5 cup"
   let quantity = null;
   let unit = null;
   let ok = true;

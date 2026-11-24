@@ -134,3 +134,12 @@ test('more look-alikes from real photos', () => {
   assert.equal(parseIngredient('Ee LL. nund pepPPE').ok, false);
   assert.equal(parseIngredient('2 tbsp olive oil').ok, true);
 });
+
+test('bullets read as dots and arrows on a phone photo', () => {
+  assert.deepEqual(joinIngredientLines([['WHAT WE SEND', '. beef mince', '. 2 vegetable stock cubes', '. 200g macaroni pasta’', '« thyme', "' 1 zucchini", '« 2 garlic cloves']]),
+    ['beef mince', '2 vegetable stock cubes', '200g macaroni pasta', 'thyme', '1 zucchini', '2 garlic cloves']);
+  assert.equal(cleanIngredientLine('’ of a white onion'), '? of a white onion');
+  assert.equal(cleanIngredientLine('’ cup oil'), '? cup oil');
+  assert.equal(parseIngredient('. 2 vegetable stock cubes').quantity, 2);
+  assert.equal(parseIngredient('.5 cup milk').quantity, 0.5);
+});

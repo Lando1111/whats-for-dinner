@@ -29,6 +29,7 @@ export function ShopChecklist({ sources, household, userId, say, onDone, sticky 
   const [busy, setBusy] = useState(false);
   const [allOrganic, setAllOrganic] = useState(false);
   const [organicPick, setOrganicPick] = useState({});
+  const [moving, setMoving] = useState(null);
 
   useEffect(() => {
     fetchItems().then((it) => setOnList(it.filter((i) => !i.archived_at))).catch(() => {});
@@ -86,6 +87,19 @@ export function ShopChecklist({ sources, household, userId, say, onDone, sticky 
     setBusy(false);
   }
 
+  // Move an item to another part of the shop and remember it for the household.
+  async function moveTo(l, section) {
+    setMoving(null);
+    if (section === l.section) return;
+    const name = l.name.toLowerCase().trim();
+    const mem = memoryFor(l.name, sections);
+    setSections((s) => ({ ...s, [name]: { section, organic: !!mem?.organic, buy_note: mem?.buy_note ?? null } }));
+    try {
+      await run({ type: 'memory', household_id: household.id, name, section, organic: !!mem?.organic, buy_note: mem?.buy_note ?? null });
+      say(`${l.name} moved to ${SECTIONS.find((s) => s.id === section).label}. Remembered for next time.`);
+    } catch (err) { say(friendly(err), true); }
+  }
+
   if (!recipes) return <p class="cap">Loading…</p>;
   if (!lines.length) return null;
   const groups = SECTIONS.map((s) => ({ ...s, lines: lines.filter((l) => l.section === s.id) })).filter((g) => g.lines.length);
@@ -98,7 +112,7 @@ export function ShopChecklist({ sources, household, userId, say, onDone, sticky 
           <button class="switch" role="switch" aria-checked={allOrganic ? 'true' : 'false'} aria-label="Buy organic for everything" onClick={() => setAllOrganic(!allOrganic)} />
         </div>
       </div>
-      <p class="cap" style="margin:0">Or tap the leaf on a single item. The app remembers those, so the shopper sees them every time.</p>
+      <p class="cap" style="margin:0">Or tap the leaf on a single item. The app remembers those, so the shopper sees them every time. In the wrong part of the shop? Tap the item's name to move it.</p>
       <div style="display:flex;gap:8px">
         <button class="link" style="padding:0" onClick={() => setPicked(Object.fromEntries(lines.map((l) => [l.id, true])))}>Tick all</button>
         <button class="link" onClick={() => setPicked({})}>Clear</button>
@@ -113,7 +127,7 @@ export function ShopChecklist({ sources, household, userId, say, onDone, sticky 
               return (
                 <li>
                   <button class="tickbox" role="checkbox" aria-checked={on ? 'true' : 'false'} aria-label={`Missing ${l.name}`} onClick={() => setPicked({ ...picked, [l.id]: !on })}>{on && <Icon name="check" size={18} stroke={3} />}</button>
-                  <span class="shop-text"><span class="nm">{l.name}</span>{sub && <span class="cap">{sub}</span>}</span>
+                  <button class="shop-text" onClick={() => setMoving(l)} aria-label={`${l.name}. Change which part of the shop`}><span class="nm">{l.name}</span>{sub && <span class="cap">{sub}</span>}</button>
                   <span class="qty">{formatAmount(l.amt)}</span>
                   <button class="leafbtn" aria-pressed={allOrganic || lineOrganic(l) ? 'true' : 'false'} disabled={allOrganic} aria-label={`Organic ${l.name}`}
                     onClick={() => setOrganicPick({ ...organicPick, [l.id]: !lineOrganic(l) })}><Icon name="leaf" size={18} /></button>
@@ -123,6 +137,19 @@ export function ShopChecklist({ sources, household, userId, say, onDone, sticky 
           </ul>
         </section>
       ))}
+      {moving && (
+        <div class="scrim" onClick={(e) => e.target === e.currentTarget && setMoving(null)}>
+          <section class="sheet" role="dialog" aria-label={`Move ${moving.name}`}>
+            <div class="handle" />
+            <h2 style="margin:0;font:600 22px/28px var(--display)">{moving.name}</h2>
+            <span class="lbl" style="margin:0">Which part of the shop?</span>
+            <div class="chips">
+              {SECTIONS.map((s) => <button class="chipbtn" aria-pressed={moving.section === s.id ? 'true' : 'false'} onClick={() => moveTo(moving, s.id)}>{s.label}</button>)}
+            </div>
+            <span class="cap">Remembered for next time, on both phones.</span>
+          </section>
+        </div>
+      )}
       <div class={sticky ? 'footer-bar' : ''} style={sticky ? '' : 'display:flex'}>
         <button class="btn block" disabled={!count || busy} onClick={addToList}>{busy ? 'Adding…' : count ? `Add ${count} to shopping list` : 'Tick what you need'}</button>
       </div>

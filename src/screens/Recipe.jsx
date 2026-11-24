@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { useRecipes, usePhotoUrls, setRecipePhoto, seasonsText, PROTEIN_LABEL, MEAL_TYPE_LABEL, isDinner, EXTRAS_NAME, isoDate } from '../lib/data.js';
+import { useRecipes, usePhotoUrls, setRecipePhoto, seasonsText, PROTEIN_LABEL, MEAL_TYPE_LABEL, OCCASION_LABEL, isDinner, EXTRAS_NAME, isoDate } from '../lib/data.js';
 import { convertLine, formatAmount, formatOriginal, fahrenheitToCelsius } from '../lib/units.js';
 import { loadPlan, planRecipe, addExtra, mondayOf } from '../lib/plan.js';
 import { ShopChecklist } from './ShopChecklist.jsx';
@@ -59,7 +59,7 @@ export function Recipe({ id, household, canEdit, say, userId }) {
           {!isDinner(recipe) && <span class="chip big" style="background:var(--apricot);color:var(--on-ap)">{MEAL_TYPE_LABEL[recipe.meal_type]}</span>}
           {recipe.protein && <span class="chip big" style="background:var(--sage)">{PROTEIN_LABEL[recipe.protein]}</span>}
           {recipe.makes_leftovers && <span class="chip big" style="background:var(--butter)">Makes leftovers</span>}
-          {recipe.easy_fun && <span class="chip big" style="background:var(--butter)">Easy / fun</span>}
+          {(recipe.occasions || []).map((o) => <span class="chip big" style="background:var(--butter)">{OCCASION_LABEL[o]}</span>)}
           <span class="chip big" style="background:var(--duck)">{seasonsText(recipe.seasons)}</span>
         </div>
         {recipe.source_url && <a href={recipe.source_url} target="_blank" rel="noopener" style="font-size:14px;overflow-wrap:anywhere">{recipe.source_url}</a>}

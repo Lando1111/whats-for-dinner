@@ -8,7 +8,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' }
 });
 
-export const APP_URL = `${location.origin}${import.meta.env.BASE_URL}`;
+export const APP_URL = typeof location === "undefined" ? "" : `${location.origin}${import.meta.env.BASE_URL}`;
 
 // Turns a Supabase/Postgres error into a sentence a person can act on.
 export function friendly(error) {

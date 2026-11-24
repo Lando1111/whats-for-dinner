@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { supabase, friendly } from '../lib/supabase.js';
 import { useRecipes } from '../lib/data.js';
 import { fetchItems, fetchSections, cachedItems, run, flush, pendingCount, updateCache } from '../lib/shopping.js';
-import { SECTIONS, SECTION_LABEL, sectionFor, memoryFor } from '../lib/sections.js';
+import { SECTIONS, SECTION_LABEL, sectionFor, memoryFor, guessSection } from '../lib/sections.js';
 import { parseIngredient } from '../lib/parse.js';
 import { formatAmount } from '../lib/units.js';
 import { Icon } from '../icons.jsx';
@@ -14,6 +14,7 @@ export function Shopping({ household, say, userId }) {
   const titleOf = useMemo(() => Object.fromEntries(recipes.map((r) => [r.id, r.title])), [recipes]);
   const [items, setItems] = useState(cachedItems);
   const [sections, setSections] = useState({});
+  const [sectionsLoaded, setSectionsLoaded] = useState(false);
   const [tab, setTab] = useState('buy');
   const [offline, setOffline] = useState(!navigator.onLine);
   const [text, setText] = useState('');
@@ -27,7 +28,7 @@ export function Shopping({ household, say, userId }) {
     try {
       await flush();
       const [it, sec] = await Promise.all([fetchItems(), fetchSections()]);
-      setItems(it); setSections(sec); setOffline(false);
+      setItems(it); setSections(sec); setSectionsLoaded(true); setOffline(false);
     } catch { setOffline(true); }
   }, []);
 
@@ -83,7 +84,7 @@ export function Shopping({ household, say, userId }) {
   // Remember the household's choice for this item (section, organic, note) for next time.
   function remember(item, patch) {
     const name = item.name.toLowerCase().trim();
-    const mem = { section: item.category || sectionFor(item.name, sections), organic: !!item.organic, buy_note: item.buy_note || null, ...(memoryFor(item.name, sections) || {}), ...patch };
+    const mem = { section: sectionOf(item), organic: !!item.organic, buy_note: item.buy_note || null, ...(memoryFor(item.name, sections) || {}), ...patch };
     setSections((s) => ({ ...s, [name]: mem }));
     act({ type: 'memory', household_id: household.id, name, ...mem });
   }
@@ -102,7 +103,10 @@ export function Shopping({ household, say, userId }) {
 
   const toBuy = items.filter((i) => !i.archived_at);
   const bought = items.filter((i) => i.archived_at).sort((a, b) => b.archived_at.localeCompare(a.archived_at));
-  const groups = SECTIONS.map((s) => ({ ...s, items: toBuy.filter((i) => (i.category || sectionFor(i.name, sections)) === s.id) })).filter((g) => g.items.length);
+  // Where each item goes: the household's saved choice, then the built-in guess. The section stored on
+  // the item is only used offline before saved choices have loaded.
+  const sectionOf = (i) => memoryFor(i.name, sections)?.section || (sectionsLoaded ? guessSection(i.name) : i.category || guessSection(i.name));
+  const groups = SECTIONS.map((s) => ({ ...s, items: toBuy.filter((i) => sectionOf(i) === s.id) })).filter((g) => g.items.length);
   const amount = (i) => formatAmount({ q: i.quantity == null ? null : Number(i.quantity), unit: i.unit });
   const from = (i) => (i.recipe_ids?.length ? i.recipe_ids.map((id) => titleOf[id]).filter(Boolean).join(', ') : 'Added by hand');
 
@@ -134,7 +138,7 @@ export function Shopping({ household, say, userId }) {
               <p style="margin:0;font-weight:700">Nothing to buy</p>
               <p class="cap" style="margin:0;max-width:280px">Add things above, or use <strong>Build list</strong> on the Week screen to add what this week's meals need.</p>
             </div>
-          ) : groups.map((g) => (
+          ) : [<p class="cap" style="margin:0">In the wrong part of the shop? Tap the item to move it.</p>, ...groups.map((g) => (
             <section>
               <h2 class="lbl">{g.label}</h2>
               <ul class="card shop">
@@ -150,7 +154,7 @@ export function Shopping({ household, say, userId }) {
                 ))}
               </ul>
             </section>
-          ))}
+          ))]}
         </>
       ) : (
         <>
@@ -181,6 +185,13 @@ export function Shopping({ household, say, userId }) {
           <section class="sheet" role="dialog" aria-label={`Move ${edit.name}`}>
             <div class="handle" />
             <div class="row-head"><h2 style="margin:0;font:600 22px/28px var(--display)">{edit.name}</h2><button class="icon-btn" style="margin-left:auto" aria-label="Close" onClick={() => setEdit(null)}><Icon name="close" /></button></div>
+            <span class="lbl" style="margin:0">Which part of the shop?</span>
+            <div class="chips">
+              {SECTIONS.map((s) => (
+                <button class="chipbtn" aria-pressed={sectionOf(edit) === s.id ? 'true' : 'false'} onClick={() => move(edit, s.id)}>{s.label}</button>
+              ))}
+            </div>
+            <span class="cap">Remembered for next time, whoever adds it.</span>
             <div class="srow">
               <Icon name="leaf" /><span style="display:flex;flex-direction:column"><span>Buy organic</span><span class="cap">Remembered for next time</span></span>
               <button class="switch" role="switch" aria-checked={edit.organic ? 'true' : 'false'} aria-label="Buy organic" onClick={() => setPref(edit, { organic: !edit.organic })} />
@@ -190,13 +201,6 @@ export function Shopping({ household, say, userId }) {
               <input id="bn" class="field" maxLength={60} placeholder="e.g. free-range, or a brand" value={note} onInput={(e) => setNote(e.currentTarget.value)}
                 onBlur={() => (note.trim() || null) !== (edit.buy_note || null) && setPref(edit, { buy_note: note.trim() || null })} />
             </div>
-            <span class="lbl" style="margin:0">Which part of the shop?</span>
-            <div class="chips">
-              {SECTIONS.map((s) => (
-                <button class="chipbtn" aria-pressed={(edit.category || sectionFor(edit.name, sections)) === s.id ? 'true' : 'false'} onClick={() => move(edit, s.id)}>{s.label}</button>
-              ))}
-            </div>
-            <span class="cap">The app remembers these for next time, whoever adds it.</span>
             <button class="link" style="align-self:flex-start;padding:0" onClick={() => { act({ type: 'delete', id: edit.id }, (cur) => cur.filter((x) => x.id !== edit.id)); setEdit(null); }}>Remove from list</button>
           </section>
         </div>

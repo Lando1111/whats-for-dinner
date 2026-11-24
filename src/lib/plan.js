@@ -1,6 +1,6 @@
 // Week plan: reading and writing nights, leftovers, and the random picker.
 import { supabase } from './supabase.js';
-import { isoDate, fromIso, inSeason, seasonNow, isDinner } from './data.js';
+import { isoDate, fromIso, inSeason, seasonNow, isDinner, DEFAULT_WEEKEND } from './data.js';
 
 export async function loadPlan(fromIso, toIso) {
   const { data, error } = await supabase.from('meal_plan').select('*').gte('date', fromIso).lte('date', toIso).order('date');
@@ -61,15 +61,34 @@ const shuffle = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--
  * Choose a recipe for one night.
  * avoid: recipe ids used recently or elsewhere this week. needLeftovers: only recipes that make leftovers.
  */
-export function pickRecipe(recipes, { date, avoid = new Set(), needLeftovers = false, wantVeg = false } = {}) {
+// Does a recipe suit this night? Weekend nights suit Weekend or Slow cooking recipes; other nights
+// suit Weeknight ones. A recipe tagged only for the other kind of night "clashes"; untagged ones suit any night.
+export function nightFit(recipe, date, weekendDays = DEFAULT_WEEKEND) {
+  if (!date) return 'any';
+  const o = recipe.occasions || [];
+  const weekend = weekendDays.includes(fromIso(date).getDay());
+  const forWeekend = o.includes('weekend') || o.includes('slow_cook');
+  const forWeeknight = o.includes('weeknight');
+  if (weekend ? forWeekend : forWeeknight) return 'fits';
+  if (weekend ? forWeeknight : forWeekend) return 'clashes';
+  return 'any';
+}
+
+export function pickRecipe(recipes, { date, avoid = new Set(), needLeftovers = false, wantVeg = false, weekendDays = DEFAULT_WEEKEND } = {}) {
   const season = seasonNow(date ? fromIso(date) : new Date());
   recipes = recipes.filter(isDinner);
   let pool = recipes.filter((r) => (!needLeftovers || r.makes_leftovers) && (!wantVeg || r.protein === 'vegetarian'));
   if (!pool.length && needLeftovers) pool = recipes.filter((r) => !wantVeg || r.protein === 'vegetarian');
   if (!pool.length) pool = recipes;
+  const fresh = (r) => !avoid.has(r.id);
+  const fit = (r) => nightFit(r, date, weekendDays);
   const tiers = [
-    pool.filter((r) => !avoid.has(r.id) && inSeason(r, season)),
-    pool.filter((r) => !avoid.has(r.id)),
+    pool.filter((r) => fresh(r) && fit(r) === 'fits' && inSeason(r, season)),
+    pool.filter((r) => fresh(r) && fit(r) === 'fits'),
+    pool.filter((r) => fresh(r) && fit(r) === 'any' && inSeason(r, season)),
+    pool.filter((r) => fresh(r) && fit(r) === 'any'),
+    pool.filter((r) => fresh(r) && inSeason(r, season)),
+    pool.filter(fresh),
     pool
   ];
   const tier = tiers.find((t) => t.length) || [];
@@ -84,6 +103,7 @@ export function planFill({ recipes, weekDates, plan, recent, settings }) {
   recipes = recipes.filter(isDinner);
   const leftoverDays = settings?.leftover_weekdays || [];
   const minVeg = settings?.min_veg_nights || 0;
+  const weekendDays = settings?.weekend_weekdays || DEFAULT_WEEKEND;
   const byDate = Object.fromEntries(plan.map((p) => [p.date, p]));
   const avoid = new Set([...recent, ...plan.filter((p) => p.recipe_id).map((p) => p.recipe_id)]);
   const empty = weekDates.filter((d) => !byDate[d]);
@@ -97,7 +117,7 @@ export function planFill({ recipes, weekDates, plan, recent, settings }) {
     const remaining = order.length - i;
     const needLeftovers = leftoverDays.includes(fromIso(date).getDay());
     const wantVeg = hasVeg && vegStillNeeded > 0 && (vegStillNeeded >= remaining || Math.random() < vegStillNeeded / remaining + 0.2);
-    const recipe = pickRecipe(recipes, { date, avoid, needLeftovers, wantVeg });
+    const recipe = pickRecipe(recipes, { date, avoid, needLeftovers, wantVeg, weekendDays });
     if (!recipe) return;
     avoid.add(recipe.id);
     if (recipe.protein === 'vegetarian') vegStillNeeded = Math.max(0, vegStillNeeded - 1);

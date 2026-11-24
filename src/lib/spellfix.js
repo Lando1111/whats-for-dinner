@@ -22,6 +22,7 @@ chickpeas lentils beans kidney cannellini passata cheese rind feta ricotta hallo
 seeded deseeded cored stemmed wedges strips florets segments slivered flaked desiccated toasted grilled steamed boiled
 mashed pureed blanched marinated seasoned stuffed skewers tablespoons teaspoons tablespoon teaspoon cups quarts pints
 ounces pounds grams kilograms millilitres litres sprinkle drizzle splash dash bought store stirred whisked sifted
+pages page using until about directions column options other
 `;
 
 const VOCAB = new Set();
@@ -60,7 +61,8 @@ export function fixWord(word) {
   const limit = lower.length >= 9 ? 2 : 1;
   const hits = [];
   for (const v of VOCAB) {
-    if (v.length >= 5 && close(lower, v, limit)) { hits.push(v); if (hits.length > 1) return word; }
+    // Same first letter only: misreads keep it (cocking/cooking, gorlic/garlic), and it stops "pages" → "sages".
+    if (v.length >= 5 && v[0] === lower[0] && close(lower, v, limit)) { hits.push(v); if (hits.length > 1) return word; }
   }
   if (hits.length !== 1) return word;
   const fixed = hits[0];

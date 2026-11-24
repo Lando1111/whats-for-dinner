@@ -192,7 +192,7 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
   function surprise() {
     const avoid = new Set([...recent, ...plan.filter((p) => p.recipe_id && p.date !== date).map((p) => p.recipe_id), row?.recipe_id].filter(Boolean));
     const needLeftovers = (household.settings?.leftover_weekdays || []).includes(d.getDay());
-    const r = pickRecipe(recipes, { date, avoid, needLeftovers });
+    const r = pickRecipe(recipes, { date, avoid, needLeftovers, weekendDays: household.settings?.weekend_weekdays });
     if (!r) return say('Add some recipes first.', true);
     choose(r);
   }

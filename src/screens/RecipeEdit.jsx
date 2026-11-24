@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { useRecipes, saveRecipe, deleteRecipe, setRecipePhoto, SEASON_LIST, PROTEINS, MEAL_TYPES, EXTRAS_NAME } from '../lib/data.js';
+import { useRecipes, saveRecipe, deleteRecipe, setRecipePhoto, SEASON_LIST, PROTEINS, MEAL_TYPES, OCCASIONS, EXTRAS_NAME } from '../lib/data.js';
 import { parseIngredients, parseMethod, splitRecipeText, guessProtein } from '../lib/parse.js';
 import { formatQty } from '../lib/units.js';
 import { supabase, friendly } from '../lib/supabase.js';
@@ -27,7 +27,7 @@ function Form({ existing, household, say }) {
     meal_type: existing?.meal_type || 'dinner',
     protein: existing?.protein || null,
     seasons: existing?.seasons || ['all'],
-    easy_fun: existing?.easy_fun || false,
+    occasions: existing?.occasions || [],
     makes_leftovers: existing?.makes_leftovers || false,
     source_note: existing?.source_note || '',
     source_url: existing?.source_url || ''
@@ -292,9 +292,13 @@ function Form({ existing, household, say }) {
           </div>
           <h2 class="lbl" style="margin:8px 0 0">Good for</h2>
           <div class="chips">
-            <button type="button" class="chipbtn butter" aria-pressed={r.easy_fun ? 'true' : 'false'} onClick={() => set('easy_fun', !r.easy_fun)}>Easy / fun</button>
+            {OCCASIONS.map(([v, l]) => (
+              <button type="button" class="chipbtn butter" aria-pressed={r.occasions.includes(v) ? 'true' : 'false'}
+                onClick={() => set('occasions', r.occasions.includes(v) ? r.occasions.filter((x) => x !== v) : [...r.occasions, v])}>{l}</button>
+            ))}
             <button type="button" class="chipbtn butter" aria-pressed={r.makes_leftovers ? 'true' : 'false'} onClick={() => set('makes_leftovers', !r.makes_leftovers)}>Makes leftovers</button>
           </div>
+          <span class="cap">Fill the week uses Weekend and Slow cooking meals on weekend nights, and Weeknight meals on the others.</span>
         </section>
 
         <div>

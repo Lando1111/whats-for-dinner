@@ -1,3 +1,4 @@
+import { DEFAULT_WEEKEND } from '../lib/data.js';
 import { useState } from 'preact/hooks';
 import { supabase, friendly } from '../lib/supabase.js';
 import { getTheme, setTheme } from '../lib/theme.js';
@@ -31,6 +32,7 @@ export function Settings({ member, household, reload, say }) {
   const s = household.settings || {};
   const units = s.unit_prefs || { dry: 'g', liquid: 'ml', butter: 'g' };
   const leftovers = s.leftover_weekdays || [];
+  const weekend = s.weekend_weekdays || DEFAULT_WEEKEND;
 
   async function save(patch) {
     const settings = { ...s, ...patch };
@@ -74,6 +76,20 @@ export function Settings({ member, household, reload, say }) {
                   <button type="button" aria-label={long} aria-pressed={on ? 'true' : 'false'} disabled={!isOwner}
                     style={`flex:1;height:44px;border-radius:999px;border:2px solid ${on ? 'var(--butter)' : 'var(--ls)'};background:${on ? 'var(--butter)' : 'var(--raised)'};font-weight:700;font-size:14px;padding:0`}
                     onClick={() => save({ leftover_weekdays: on ? leftovers.filter((x) => x !== n) : [...leftovers, n] })}>{short}</button>
+                );
+              })}
+            </div>
+          </div>
+          <div style="padding:10px 0;border-bottom:1px solid var(--line)">
+            <span>Weekend nights</span>
+            <span class="cap" style="display:block">Fill the week picks Weekend and Slow cooking meals for these nights, and Weeknight meals for the rest.</span>
+            <div role="group" aria-label="Weekend nights" style="display:flex;gap:4px;margin-top:8px">
+              {WEEKDAYS.map(([short, long, n]) => {
+                const on = weekend.includes(n);
+                return (
+                  <button type="button" aria-label={long} aria-pressed={on ? 'true' : 'false'} disabled={!isOwner}
+                    style={`flex:1;height:44px;border-radius:999px;border:2px solid ${on ? 'var(--butter)' : 'var(--ls)'};background:${on ? 'var(--butter)' : 'var(--raised)'};font-weight:700;font-size:14px;padding:0`}
+                    onClick={() => save({ weekend_weekdays: on ? weekend.filter((x) => x !== n) : [...weekend, n] })}>{short}</button>
                 );
               })}
             </div>

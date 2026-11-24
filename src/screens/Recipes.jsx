@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'preact/hooks';
-import { useRecipes, usePhotoUrls, inSeason, seasonNow, PROTEIN_LABEL, MEAL_TYPE_LABEL, isDinner } from '../lib/data.js';
+import { useRecipes, usePhotoUrls, inSeason, seasonNow, PROTEIN_LABEL, MEAL_TYPE_LABEL, OCCASIONS, OCCASION_LABEL, isDinner } from '../lib/data.js';
 import { Icon } from '../icons.jsx';
 
 const FILTERS = [
@@ -8,7 +8,7 @@ const FILTERS = [
   ['extras', 'Bake & prep'],
   ['season', 'In season'],
   ['vegetarian', 'Vegetarian'],
-  ['easy', 'Easy / fun'],
+  ...OCCASIONS,
   ['leftovers', 'Leftovers']
 ];
 
@@ -26,7 +26,7 @@ export function Recipes({ canEdit, pick, onPick, startFilter = 'all', title }) {
       if (filter === 'extras' && isDinner(r)) return false;
       if (filter === 'season' && !inSeason(r, season)) return false;
       if (filter === 'vegetarian' && r.protein !== 'vegetarian') return false;
-      if (filter === 'easy' && !r.easy_fun) return false;
+      if (OCCASION_LABEL[filter] && !(r.occasions || []).includes(filter)) return false;
       if (filter === 'leftovers' && !r.makes_leftovers) return false;
       if (!needle) return true;
       return r.title.toLowerCase().includes(needle) || r.ingredients.some((i) => i.name.toLowerCase().includes(needle));
@@ -77,7 +77,7 @@ export function Recipes({ canEdit, pick, onPick, startFilter = 'all', title }) {
                     <span style="display:flex;gap:6px;flex-wrap:wrap">
                       {!isDinner(r) && <span class="chip" style="background:var(--apricot);color:var(--on-ap)">{MEAL_TYPE_LABEL[r.meal_type]}</span>}
                       {r.protein && <span class="chip" style="background:var(--sage)">{PROTEIN_LABEL[r.protein]}</span>}
-                      {r.easy_fun && <span class="chip" style="background:var(--butter)">Easy / fun</span>}
+                      {(r.occasions || []).map((o) => <span class="chip" style="background:var(--butter)">{OCCASION_LABEL[o]}</span>)}
                       {r.makes_leftovers && <span class="chip" style="background:var(--butter)">Leftovers</span>}
                       {!r.photo_path && <span class="cap" style="line-height:22px">No photo yet</span>}
                     </span>

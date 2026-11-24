@@ -45,7 +45,7 @@ export async function saveRecipe(recipe, lines, householdId) {
     method: recipe.method,
     seasons: recipe.seasons?.length ? recipe.seasons : ['all'],
     protein: recipe.protein || null,
-    easy_fun: !!recipe.easy_fun,
+    occasions: recipe.occasions || [],
     makes_leftovers: !!recipe.makes_leftovers,
     measure_system: recipe.measure_system || 'AU',
     meal_type: recipe.meal_type || 'dinner',
@@ -145,6 +145,11 @@ export const MEAL_TYPES = [['dinner', 'Dinner'], ['baking', 'Baking'], ['breakfa
 export const MEAL_TYPE_LABEL = Object.fromEntries(MEAL_TYPES);
 export const isDinner = (r) => !r.meal_type || r.meal_type === 'dinner';
 // What the weekly non-dinner list is called in the app. Change here to rename it everywhere.
+// When a meal suits. Weeknight = quicker; weekend = longer cooks (Fill the week uses both).
+export const OCCASIONS = [['weeknight', 'Weeknight'], ['weekend', 'Weekend'], ['hosting', 'Hosting'], ['slow_cook', 'Slow cooking']];
+export const OCCASION_LABEL = Object.fromEntries(OCCASIONS);
+export const DEFAULT_WEEKEND = [6, 0]; // Saturday and Sunday nights
+
 export const EXTRAS_NAME = 'Bake & prep';
 export function seasonNow(d = new Date()) {
   const m = d.getMonth(); // southern hemisphere

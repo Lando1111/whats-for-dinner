@@ -189,3 +189,20 @@ test('one-letter misreads of cooking words are corrected', () => {
     assert.equal(fixSpelling(ok), ok);
   }
 });
+
+test('a page footer further left does not swallow the list', () => {
+  const box = [
+    { text: '¼ cup (60 ml) cooking oil (coconut, avocado,', x0: 120, x1: 700, h: 30 },
+    { text: 'or animal fat like lard or butter)', x0: 170, x1: 600, h: 30 },
+    { text: 'Sea salt', x0: 121, x1: 260, h: 30 },
+    { text: '%2 of a white or yellow onion, roughly chopped', x0: 122, x1: 720, h: 30 },
+    { text: '6 medium fresh tomatoes, quartered, with', x0: 120, x1: 640, h: 30 },
+    { text: 'seeds left in', x0: 168, x1: 400, h: 30 },
+    { text: '4 cloves garlic, roughly chopped', x0: 119, x1: 560, h: 30 },
+    { text: '148 the first forty days', x0: 30, x1: 400, h: 30 }
+  ];
+  const out = joinIngredientLines([box]);
+  assert.deepEqual(out.slice(0, 5), ['¼ cup (60 ml) cooking oil (coconut, avocado, or animal fat like lard or butter)', 'Sea salt',
+    '~½ of a white or yellow onion, roughly chopped', '6 medium fresh tomatoes, quartered, with seeds left in', '4 cloves garlic, roughly chopped']);
+  assert.equal(parseIngredient(out[5]).ok, false);
+});

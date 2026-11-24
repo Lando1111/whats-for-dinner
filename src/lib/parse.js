@@ -113,6 +113,8 @@ export function parseIngredient(raw) {
   }
 
   if (/\d[a-z]|[a-z]\d/i.test(line) || (quantity != null && quantity > 5000)) ok = false;
+  // A big bare number is a page number or misread, not "148 onions".
+  if (quantity != null && !unit && quantity > 50) ok = false;
   // Amounts that are probably misread: "14 tbsp" (was 1½), "25 cups".
   if (quantity != null && ((['tsp', 'tbsp'].includes(unit) && quantity >= 10) || (unit === 'cup' && quantity > 10))) ok = false;
   // Odd capitals inside a word ("pepPPE") come from misread text.

@@ -77,6 +77,15 @@ const SERVES_LINE = /^(?:serves|makes|servings?|feeds|yield)\b.*\d/i;
 const SKIP_AFTER = /^(tools|equipment|utensils|allergens|nutrition)/i;
 const isCapsHeading = (t) => /[A-Z]{3}/.test(t) && t === t.toUpperCase() && !/\d/.test(t);
 
+// The left edge most lines start at (a lone page number or footer further left mustn't set it).
+function leftEdge(sized, lineH) {
+  if (!sized.length) return null;
+  const xs = sized.map((l) => l.x0).sort((a, b) => a - b);
+  const need = Math.max(2, Math.ceil(xs.length * 0.2));
+  for (const x of xs) if (xs.filter((y) => Math.abs(y - x) <= lineH * 0.5).length >= need) return x;
+  return xs[0];
+}
+
 const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 const toLine = (l) => (typeof l === 'string' ? { text: l } : l);
 const lettersIn = (t) => (t.match(/[A-Za-z]/g) || []).length;
@@ -97,8 +106,8 @@ export function joinIngredientLines(boxes) {
   for (const box of boxes) {
     const lines = box.map(toLine).filter((l) => l.text && l.text.trim());
     const sized = lines.filter((l) => l.x0 != null && lettersIn(l.text) >= 3);
-    const margin = sized.length ? Math.min(...sized.map((l) => l.x0)) : null;
     const lineH = median(sized.map((l) => l.h || 0)) || 30;
+    const margin = leftEdge(sized, lineH);
     const capsBook = lines.filter((l) => isCapsHeading(l.text.trim())).length > lines.length / 2;
     let skipping = false;
     let prev = null;
@@ -118,9 +127,10 @@ export function joinIngredientLines(boxes) {
       // ingredient). Without them (pasted text), go by unfinished brackets and phrases.
       const placed = margin != null && l.x0 != null;
       const startsAmount = /^[\d¼½¾⅓⅔?~]/.test(cleanIngredientLine(text));
-      const carry = prev && !bulleted && (
+      // A line that starts with an amount is always a new ingredient.
+      const carry = prev && !bulleted && !startsAmount && (
         (placed && (indented || /[A-Za-z]-$/.test(prev.text)))
-        || (!startsAmount && (hasOpenBracket(prev.text) || endsMidPhrase(prev.text))));
+        || hasOpenBracket(prev.text) || endsMidPhrase(prev.text));
       if (carry) prev.text = joinText(prev.text, text);
       else { prev = { text }; out.push(prev); }
     }
@@ -137,9 +147,9 @@ export function joinMethodLines(boxes) {
   for (const box of boxes) {
     const lines = box.map(toLine).filter((l) => l.text && lettersIn(l.text) >= 1);
     const sized = lines.filter((l) => l.x0 != null && lettersIn(l.text) >= 3);
-    const margin = sized.length ? Math.min(...sized.map((l) => l.x0)) : null;
-    const right = sized.length ? Math.max(...sized.map((l) => l.x1)) : null;
     const lineH = median(sized.map((l) => l.h || 0)) || 30;
+    const margin = leftEdge(sized, lineH);
+    const right = sized.length ? Math.max(...sized.map((l) => l.x1)) : null;
     const paras = [];
     let cur = null;
     let prevLine = null;

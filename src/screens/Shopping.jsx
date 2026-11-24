@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { supabase, friendly } from '../lib/supabase.js';
 import { useRecipes } from '../lib/data.js';
 import { fetchItems, fetchSections, cachedItems, run, flush, pendingCount, updateCache } from '../lib/shopping.js';
-import { SECTIONS, SECTION_LABEL, sectionFor } from '../lib/sections.js';
+import { SECTIONS, SECTION_LABEL, sectionFor, memoryFor } from '../lib/sections.js';
 import { parseIngredient } from '../lib/parse.js';
 import { formatAmount } from '../lib/units.js';
 import { Icon } from '../icons.jsx';
@@ -20,6 +20,7 @@ export function Shopping({ household, say, userId }) {
   const [pending, setPending] = useState({}); // id → true while the undo timer runs
   const [snack, setSnack] = useState(null);
   const [edit, setEdit] = useState(null);
+  const [note, setNote] = useState('');
   const timers = useRef({});
 
   const load = useCallback(async () => {
@@ -73,17 +74,30 @@ export function Shopping({ household, say, userId }) {
     const p = parseIngredient(text);
     if (!p) return;
     const name = p.note && !p.quantity ? `${p.name}` : p.name;
-    const row = { id: crypto.randomUUID(), household_id: household.id, name, quantity: p.quantity, unit: p.unit, category: sectionFor(name, sections), recipe_ids: [], created_by: userId, created_at: new Date().toISOString(), archived_at: null };
+    const mem = memoryFor(name, sections);
+    const row = { id: crypto.randomUUID(), household_id: household.id, name, quantity: p.quantity, unit: p.unit, category: sectionFor(name, sections), organic: !!mem?.organic, buy_note: mem?.buy_note || null, recipe_ids: [], created_by: userId, created_at: new Date().toISOString(), archived_at: null };
     setText('');
     act({ type: 'add', row }, (cur) => [...cur, row]);
   }
 
-  function move(item, section) {
+  // Remember the household's choice for this item (section, organic, note) for next time.
+  function remember(item, patch) {
     const name = item.name.toLowerCase().trim();
-    setSections((s) => ({ ...s, [name]: section }));
-    act({ type: 'section', household_id: household.id, name, section });
+    const mem = { section: item.category || sectionFor(item.name, sections), organic: !!item.organic, buy_note: item.buy_note || null, ...(memoryFor(item.name, sections) || {}), ...patch };
+    setSections((s) => ({ ...s, [name]: mem }));
+    act({ type: 'memory', household_id: household.id, name, ...mem });
+  }
+
+  function move(item, section) {
+    remember(item, { section });
     act({ type: 'update', id: item.id, fields: { category: section } }, (cur) => cur.map((x) => (x.id === item.id ? { ...x, category: section } : x)));
     setEdit(null);
+  }
+
+  function setPref(item, fields) {
+    remember(item, fields);
+    act({ type: 'update', id: item.id, fields }, (cur) => cur.map((x) => (x.id === item.id ? { ...x, ...fields } : x)));
+    setEdit((e) => (e && e.id === item.id ? { ...e, ...fields } : e));
   }
 
   const toBuy = items.filter((i) => !i.archived_at);
@@ -127,9 +141,9 @@ export function Shopping({ household, say, userId }) {
                 {g.items.map((i) => (
                   <li class={pending[i.id] ? 'done' : ''}>
                     <button class="tickbox" role="checkbox" aria-checked={pending[i.id] ? 'true' : 'false'} aria-label={i.name} onClick={() => tick(i)}>{pending[i.id] && <Icon name="check" size={18} stroke={3} />}</button>
-                    <button class="shop-text" onClick={() => setEdit(i)} aria-label={`${i.name}, change section`}>
-                      <span class="nm">{i.name}</span>
-                      <span class="cap">{from(i)}</span>
+                    <button class="shop-text" onClick={() => { setEdit(i); setNote(i.buy_note || ''); }} aria-label={`${i.name}${i.organic ? ', organic' : ''}. Change section or preferences`}>
+                      <span class="nm">{i.name}{i.organic && <span class="chip organic"><Icon name="leaf" size={12} stroke={2.4} />Organic</span>}</span>
+                      <span class="cap">{i.buy_note ? <strong style="color:var(--ink)">{i.buy_note} · </strong> : null}{from(i)}</span>
                     </button>
                     <span class="qty">{amount(i)}</span>
                   </li>
@@ -167,13 +181,22 @@ export function Shopping({ household, say, userId }) {
           <section class="sheet" role="dialog" aria-label={`Move ${edit.name}`}>
             <div class="handle" />
             <div class="row-head"><h2 style="margin:0;font:600 22px/28px var(--display)">{edit.name}</h2><button class="icon-btn" style="margin-left:auto" aria-label="Close" onClick={() => setEdit(null)}><Icon name="close" /></button></div>
+            <div class="srow">
+              <Icon name="leaf" /><span style="display:flex;flex-direction:column"><span>Buy organic</span><span class="cap">Remembered for next time</span></span>
+              <button class="switch" role="switch" aria-checked={edit.organic ? 'true' : 'false'} aria-label="Buy organic" onClick={() => setPref(edit, { organic: !edit.organic })} />
+            </div>
+            <div>
+              <label class="lbl" for="bn">Note for the shopper</label>
+              <input id="bn" class="field" maxLength={60} placeholder="e.g. free-range, or a brand" value={note} onInput={(e) => setNote(e.currentTarget.value)}
+                onBlur={() => (note.trim() || null) !== (edit.buy_note || null) && setPref(edit, { buy_note: note.trim() || null })} />
+            </div>
             <span class="lbl" style="margin:0">Which part of the shop?</span>
             <div class="chips">
               {SECTIONS.map((s) => (
                 <button class="chipbtn" aria-pressed={(edit.category || sectionFor(edit.name, sections)) === s.id ? 'true' : 'false'} onClick={() => move(edit, s.id)}>{s.label}</button>
               ))}
             </div>
-            <span class="cap">The app remembers this for next time.</span>
+            <span class="cap">The app remembers these for next time, whoever adds it.</span>
             <button class="link" style="align-self:flex-start;padding:0" onClick={() => { act({ type: 'delete', id: edit.id }, (cur) => cur.filter((x) => x.id !== edit.id)); setEdit(null); }}>Remove from list</button>
           </section>
         </div>

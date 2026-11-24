@@ -34,7 +34,12 @@ export function guessSection(name) {
   return 'other';
 }
 
+// remembered: { 'item name': { section, organic, buy_note } } — the household's memory per item.
+export function memoryFor(name, remembered = {}) {
+  const m = remembered[(name || '').toLowerCase().trim()];
+  return typeof m === 'string' ? { section: m, organic: false, buy_note: null } : m || null;
+}
+
 export function sectionFor(name, remembered = {}) {
-  const key = (name || '').toLowerCase().trim();
-  return remembered[key] || guessSection(key);
+  return memoryFor(name, remembered)?.section || guessSection((name || '').toLowerCase().trim());
 }

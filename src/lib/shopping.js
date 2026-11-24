@@ -22,16 +22,21 @@ export async function fetchItems() {
 }
 
 export async function fetchSections() {
-  const { data, error } = await supabase.from('item_sections').select('name, section');
+  const { data, error } = await supabase.from('item_sections').select('name, section, organic, buy_note');
   if (error) throw error;
-  return Object.fromEntries(data.map((r) => [r.name, r.section]));
+  return Object.fromEntries(data.map((r) => [r.name, { section: r.section, organic: r.organic, buy_note: r.buy_note }]));
 }
 
 async function apply(op) {
   if (op.type === 'add') return supabase.from('shopping_items').upsert(op.row);
   if (op.type === 'update') return supabase.from('shopping_items').update(op.fields).eq('id', op.id);
   if (op.type === 'delete') return supabase.from('shopping_items').delete().eq('id', op.id);
-  if (op.type === 'section') return supabase.from('item_sections').upsert({ household_id: op.household_id, name: op.name, section: op.section });
+  if (op.type === 'section' || op.type === 'memory') {
+    const row = { household_id: op.household_id, name: op.name, section: op.section };
+    if (op.organic !== undefined) row.organic = op.organic;
+    if (op.buy_note !== undefined) row.buy_note = op.buy_note;
+    return supabase.from('item_sections').upsert(row);
+  }
   return { error: null };
 }
 

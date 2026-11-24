@@ -4,7 +4,7 @@ import { useRecipes, isoDate, fromIso } from '../lib/data.js';
 import { loadPlan, weekDatesFrom } from '../lib/plan.js';
 import { convertLine, formatAmount, mergeKey } from '../lib/units.js';
 import { fetchItems, fetchSections, run } from '../lib/shopping.js';
-import { SECTIONS, sectionFor } from '../lib/sections.js';
+import { SECTIONS, sectionFor, memoryFor } from '../lib/sections.js';
 import { go, back } from '../lib/router.js';
 import { Icon } from '../icons.jsx';
 
@@ -30,6 +30,8 @@ export function Build({ start, household, say, userId }) {
   const [sections, setSections] = useState({});
   const [picked, setPicked] = useState({});
   const [busy, setBusy] = useState(false);
+  const [allOrganic, setAllOrganic] = useState(false);
+  const [organicPick, setOrganicPick] = useState({}); // explicit per-line choices
 
   const startDate = start ? fromIso(start) : new Date();
   const dates = weekDatesFrom(startDate);
@@ -60,6 +62,7 @@ export function Build({ start, household, say, userId }) {
     return [...merged.values()].map((l) => ({ ...l, section: sectionFor(l.name, sections) }));
   }, [plan, recipes, sections]);
 
+  const lineOrganic = (l) => organicPick[l.key + l.name] ?? !!memoryFor(l.name, sections)?.organic;
   const onListKey = new Set(onList.map((i) => mergeKey(i.name, family(i.unit))));
   const count = Object.values(picked).filter(Boolean).length;
   const rTitle = (id) => recipes?.find((r) => r.id === id)?.title;
@@ -71,11 +74,17 @@ export function Build({ start, household, say, userId }) {
       for (const l of lines.filter((x) => picked[x.key + x.name])) {
         const match = existing.find((i) => mergeKey(i.name, family(i.unit)) === l.key);
         const ids = [...l.recipes];
+        const mem = memoryFor(l.name, sections);
+        const organic = allOrganic || lineOrganic(l);
+        const explicit = organicPick[l.key + l.name];
+        if (explicit !== undefined && explicit !== !!mem?.organic) {
+          await run({ type: 'memory', household_id: household.id, name: l.name.toLowerCase().trim(), section: l.section, organic: explicit, buy_note: mem?.buy_note ?? null });
+        }
         if (match) {
           const sum = addAmounts({ q: match.quantity == null ? null : Number(match.quantity), unit: match.unit }, l.amt) || { q: match.quantity, unit: match.unit };
-          await run({ type: 'update', id: match.id, fields: { quantity: sum.q, unit: sum.unit, recipe_ids: [...new Set([...(match.recipe_ids || []), ...ids])] } });
+          await run({ type: 'update', id: match.id, fields: { quantity: sum.q, unit: sum.unit, organic: match.organic || organic, recipe_ids: [...new Set([...(match.recipe_ids || []), ...ids])] } });
         } else {
-          await run({ type: 'add', row: { id: crypto.randomUUID(), household_id: household.id, name: l.name, quantity: l.amt.q, unit: l.amt.unit, category: l.section, recipe_ids: ids, created_by: userId } });
+          await run({ type: 'add', row: { id: crypto.randomUUID(), household_id: household.id, name: l.name, quantity: l.amt.q, unit: l.amt.unit, category: l.section, organic, buy_note: mem?.buy_note || null, recipe_ids: ids, created_by: userId } });
         }
       }
       say(`${count} ${count === 1 ? 'item' : 'items'} added to the shopping list`);
@@ -100,6 +109,13 @@ export function Build({ start, household, say, userId }) {
         <div class="empty"><p style="margin:0;font-weight:700">Nothing to build from</p><p class="cap" style="margin:0">Plan some meals for this week first.</p><a class="btn" href="#/week">Back to the week</a></div>
       ) : (
         <>
+          <div class="card">
+            <div class="srow" style="border:0">
+              <Icon name="leaf" /><span style="display:flex;flex-direction:column"><span>Buy organic</span><span class="cap">For everything you tick, this time</span></span>
+              <button class="switch" role="switch" aria-checked={allOrganic ? 'true' : 'false'} aria-label="Buy organic for everything" onClick={() => setAllOrganic(!allOrganic)} />
+            </div>
+          </div>
+          <p class="cap" style="margin:0">Or tap the leaf on a single item. The app remembers those, so the shopper sees them every time.</p>
           <div style="display:flex;gap:8px">
             <button class="link" style="padding:0" onClick={() => setPicked(Object.fromEntries(lines.map((l) => [l.key + l.name, true])))}>Tick all</button>
             <button class="link" onClick={() => setPicked({})}>Clear</button>
@@ -119,6 +135,8 @@ export function Build({ start, household, say, userId }) {
                         <span class="cap">{[...l.recipes].map(rTitle).filter(Boolean).join(', ')}{onListKey.has(l.key) ? ' · already on the list' : ''}</span>
                       </span>
                       <span class="qty">{formatAmount(l.amt)}</span>
+                      <button class="leafbtn" aria-pressed={allOrganic || lineOrganic(l) ? 'true' : 'false'} disabled={allOrganic} aria-label={`Organic ${l.name}`}
+                        onClick={() => setOrganicPick({ ...organicPick, [id]: !lineOrganic(l) })}><Icon name="leaf" size={18} /></button>
                     </li>
                   );
                 })}

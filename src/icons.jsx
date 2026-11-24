@@ -19,7 +19,8 @@ const paths = {
   close: <path d="M6 6l12 12M18 6L6 18" />,
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
   down: <path d="M6 9l6 6 6-6" />,
-  trash: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></>
+  trash: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></>,
+  leaf: <><path d="M5 19c0-8 5-14 15-14 0 10-6 15-14 15" /><path d="M5 19l8-8" /></>
 };
 
 export function Icon({ name, size = 22, stroke = 2 }) {

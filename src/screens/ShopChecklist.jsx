@@ -5,6 +5,7 @@ import { useRecipes } from '../lib/data.js';
 import { convertLine, formatAmount, mergeKey } from '../lib/units.js';
 import { fetchItems, fetchSections, run } from '../lib/shopping.js';
 import { SECTIONS, sectionFor, memoryFor } from '../lib/sections.js';
+import { useSectionOrder, orderedSections } from '../lib/prefs.js';
 import { Icon } from '../icons.jsx';
 
 // Same unit family can be added up: g with kg, ml with L.
@@ -30,6 +31,7 @@ export function ShopChecklist({ sources, household, userId, say, onDone, sticky 
   const [allOrganic, setAllOrganic] = useState(false);
   const [organicPick, setOrganicPick] = useState({});
   const [moving, setMoving] = useState(null);
+  const aisleOrder = useSectionOrder();
 
   useEffect(() => {
     fetchItems().then((it) => setOnList(it.filter((i) => !i.archived_at))).catch(() => {});
@@ -102,7 +104,7 @@ export function ShopChecklist({ sources, household, userId, say, onDone, sticky 
 
   if (!recipes) return <p class="cap">Loading…</p>;
   if (!lines.length) return null;
-  const groups = SECTIONS.map((s) => ({ ...s, lines: lines.filter((l) => l.section === s.id) })).filter((g) => g.lines.length);
+  const groups = orderedSections(aisleOrder).map((s) => ({ ...s, lines: lines.filter((l) => l.section === s.id) })).filter((g) => g.lines.length);
 
   return (
     <>

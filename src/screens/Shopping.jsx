@@ -3,6 +3,8 @@ import { supabase, friendly } from '../lib/supabase.js';
 import { useRecipes } from '../lib/data.js';
 import { fetchItems, fetchSections, cachedItems, run, flush, pendingCount, updateCache } from '../lib/shopping.js';
 import { SECTIONS, SECTION_LABEL, sectionFor, memoryFor, guessSection } from '../lib/sections.js';
+import { useSectionOrder, orderedSections } from '../lib/prefs.js';
+import { AisleOrder } from './AisleOrder.jsx';
 import { parseIngredient } from '../lib/parse.js';
 import { formatAmount } from '../lib/units.js';
 import { Icon } from '../icons.jsx';
@@ -15,6 +17,8 @@ export function Shopping({ household, say, userId }) {
   const [items, setItems] = useState(cachedItems);
   const [sections, setSections] = useState({});
   const [sectionsLoaded, setSectionsLoaded] = useState(false);
+  const [aisles, setAisles] = useState(false);
+  const aisleOrder = useSectionOrder();
   const [tab, setTab] = useState('buy');
   const [offline, setOffline] = useState(!navigator.onLine);
   const [text, setText] = useState('');
@@ -106,7 +110,7 @@ export function Shopping({ household, say, userId }) {
   // Where each item goes: the household's saved choice, then the built-in guess. The section stored on
   // the item is only used offline before saved choices have loaded.
   const sectionOf = (i) => memoryFor(i.name, sections)?.section || (sectionsLoaded ? guessSection(i.name) : i.category || guessSection(i.name));
-  const groups = SECTIONS.map((s) => ({ ...s, items: toBuy.filter((i) => sectionOf(i) === s.id) })).filter((g) => g.items.length);
+  const groups = orderedSections(aisleOrder).map((s) => ({ ...s, items: toBuy.filter((i) => sectionOf(i) === s.id) })).filter((g) => g.items.length);
   const amount = (i) => formatAmount({ q: i.quantity == null ? null : Number(i.quantity), unit: i.unit });
   const from = (i) => (i.recipe_ids?.length ? i.recipe_ids.map((id) => titleOf[id]).filter(Boolean).join(', ') : 'Added by hand');
 
@@ -138,7 +142,7 @@ export function Shopping({ household, say, userId }) {
               <p style="margin:0;font-weight:700">Nothing to buy</p>
               <p class="cap" style="margin:0;max-width:280px">Add things above, or use <strong>Build list</strong> on the Week screen to add what this week's meals need.</p>
             </div>
-          ) : [<p class="cap" style="margin:0">In the wrong part of the shop? Tap the item to move it.</p>, ...groups.map((g) => (
+          ) : [<div class="row-head" style="gap:8px;flex-wrap:wrap"><p class="cap" style="margin:0;flex:1;min-width:180px">In the wrong part of the shop? Tap the item to move it.</p><button class="link" style="min-height:44px" onClick={() => setAisles(true)}>Aisle order</button></div>, ...groups.map((g) => (
             <section>
               <h2 class="lbl">{g.label}</h2>
               <ul class="card shop">
@@ -205,6 +209,7 @@ export function Shopping({ household, say, userId }) {
           </section>
         </div>
       )}
+      {aisles && <AisleOrder onClose={() => setAisles(false)} say={say} />}
     </main>
   );
 }

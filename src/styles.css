@@ -177,3 +177,12 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 .compare summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .compare img { width: 100%; height: auto; border-radius: 8px; display: block; margin-top: 8px; }
 @media (prefers-reduced-motion: reduce) { .progress > span { transition: none; } }
+
+/* Aisle order: drag sections into the order you walk your shop */
+.aisle-sheet { max-height: 90dvh; overflow-y: auto; }
+.aisles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.aisle { display: flex; align-items: center; gap: 4px; min-height: 52px; padding: 0 4px 0 0; border: 1px solid var(--line); border-radius: 12px; background: var(--raised); }
+.aisle.dragging { border-color: var(--apricot); box-shadow: 0 6px 16px rgba(58, 46, 38, .18); position: relative; z-index: 1; }
+.aisle-name { flex: 1; font-weight: 700; }
+.grip { width: 44px; height: 52px; display: grid; place-items: center; color: var(--muted); cursor: grab; touch-action: none; }
+.aisle .icon-btn:disabled { opacity: .3; }

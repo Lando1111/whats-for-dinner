@@ -11,19 +11,26 @@ const EXPECT = {
   pantry: ['garlic powder', 'onion powder', 'ground ginger', 'ground cumin', 'smoked paprika', 'chilli flakes', 'chilli powder',
     'dried oregano', 'cinnamon', 'turmeric', 'sea salt', 'salt', 'black pepper', 'pepper', 'olive oil', 'sesame oil', 'coconut oil',
     'balsamic vinegar', 'soy sauce', 'fish sauce', 'tomato paste', 'tomato sauce', 'tinned tomatoes', 'crushed tomatoes', 'passata',
-    'chicken stock', 'vegetable stock cubes', 'beef broth', 'coconut milk', 'coconut cream', 'coconut aminos', 'peanut butter',
+    'chicken stock', 'vegetable stock cubes', 'beef broth', 'coconut milk', 'coconut cream', 'peanut butter',
     'butter beans', 'chickpeas', 'kidney beans', 'red lentils', 'rice', 'jasmine rice', 'rice noodles', 'macaroni pasta', 'spaghetti',
     'Israeli couscous', 'millet', 'rolled oats', 'plain flour', 'self-raising flour', 'cornflour', 'caster sugar', 'brown sugar',
     'honey', 'maple syrup', 'vanilla extract', 'baking powder', 'bicarb soda', 'cocoa powder', 'dark chocolate', 'sesame seeds',
-    'almonds', 'tuna', 'breadcrumbs', 'mustard', 'mayonnaise', 'lemon pepper', 'chicken salt', 'garlic salt', 'curry powder', 'olives'],
+    'almonds', 'tuna', 'breadcrumbs', 'mustard', 'mayonnaise', 'white wine vinegar', 'lemon pepper', 'chicken salt', 'garlic salt', 'curry powder', 'dark chocolate'],
+  deli: ['salami', 'prosciutto', 'olives', 'kalamata olives', 'chorizo'],
+  world: ['coconut aminos', 'tamari', 'miso paste', 'rice paper', 'mirin', 'gluten free pasta', 'red curry paste', 'nori sheets'],
+  snacks: ['corn chips', 'potato chips', 'crackers', 'popcorn', 'lollies', 'rice cakes'],
+  liquor: ['white wine', 'dry white wine', 'red wine', 'beer'],
+  health_beauty: ['shampoo', 'toothpaste', 'sunscreen'],
+  baby: ['nappies', 'baby wipes'],
+  pet: ['dog food', 'kitty litter'],
   fridge: ['milk', 'butter', 'unsalted butter', 'cream', 'sour cream', 'cream cheese', 'eggs', 'pasture-raised eggs', 'cheddar',
     'parmesan', 'Parmesan cheese rind', 'feta', 'greek yoghurt', 'bacon', 'ham', 'tofu', 'hummus', 'gnocchi', 'fresh pasta'],
   meat_seafood: ['beef mince', 'chicken thigh', 'chicken thighs', 'chicken breast', 'lamb chops', 'pork belly', 'sausages', 'salmon',
-    'prawns', 'ground beef', 'steak', 'chorizo', 'barramundi fillets'],
+    'prawns', 'ground beef', 'steak', 'barramundi fillets'],
   frozen: ['frozen peas', 'frozen corn', 'ice cream', 'puff pastry', 'frozen berries', 'fish fingers'],
   bakery: ['bread', 'sourdough loaf', 'hamburger buns', 'pita bread', 'tortillas wraps'.replace('tortillas wraps', 'naan')],
-  drinks: ['orange juice', 'soda water', 'beer'],
-  household: ['baking paper', 'paper towel', 'dishwashing liquid', 'cling wrap']
+  drinks: ['orange juice', 'soda water', 'coffee', 'tea bags'],
+  household: ['tea towel', 'baking paper', 'paper towel', 'dishwashing liquid', 'cling wrap']
 };
 
 test('items go to the right part of the shop', () => {

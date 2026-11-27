@@ -57,7 +57,7 @@ function Form({ existing, household, say }) {
   const [busy, setBusy] = useState(false);
   const [link, setLink] = useState('');
   const [importing, setImporting] = useState(false);
-  const [pageFile, setPageFile] = useState(null);
+  const [pageFiles, setPageFiles] = useState(null);
   const [previews, setPreviews] = useState(null);
   const [lastPhoto, setLastPhoto] = useState(null);
   const [again, setAgain] = useState(null);
@@ -87,14 +87,17 @@ function Form({ existing, household, say }) {
   }
 
   function applyPhoto(res) {
-    setPageFile(null);
+    setPageFiles(null);
     setAgain(null);
     const parsed = parseIngredients(res.ingredients.join('\n')).map((p) => ({ ...p, quantity: qtyText(p.quantity), unit: p.unit || '', note: p.note || '' }));
     const flagged = parsed.filter((p) => !p.ok).length;
     // Remember the photo and boxes so a section can be read again.
-    setLastPhoto((prev) => (res.only && prev && prev.file === res.again.file
-      ? { ...prev, boxes: { ...prev.boxes, ...res.again.boxes } }
-      : { ...res.again, boxes: { ...(prev?.boxes || {}), ...res.again.boxes } }));
+    const samePhotos = (a, b) => a?.length === b?.length && a.every((f, i) => f === b[i]);
+    setLastPhoto((prev) => (res.only && prev && samePhotos(prev.files, res.again.files)
+      ? { ...prev, rotations: res.again.rotations, boxes: { ...prev.boxes, ...res.again.boxes } }
+      : res.only && prev && prev.files?.[0] === res.again.files[0]
+        ? { ...res.again, boxes: { ...prev.boxes, ...res.again.boxes } } // pages added or removed
+        : { ...res.again }));
     if (res.only === 'ingredients') {
       if (!parsed.length) return say("Still couldn't find ingredients in that box. Try a new photo, or type them in.", true);
       setLines(parsed);
@@ -132,12 +135,12 @@ function Form({ existing, household, say }) {
       <div class="row-head" style="gap:8px;flex-wrap:wrap;margin:4px 0 12px">
         <span class="cap" style="font-weight:700">{done ? 'Not right?' : 'Read it from a photo:'}</span>
         {lastPhoto && (
-          <button type="button" class="btn outline sm" onClick={() => setAgain({ only: section, file: lastPhoto.file, start: lastPhoto })}>
+          <button type="button" class="btn outline sm" onClick={() => setAgain({ only: section, files: lastPhoto.files, start: lastPhoto })}>
             <Icon name="edit" size={18} />{hasBoxes ? 'Adjust the boxes' : 'Same photo'}
           </button>
         )}
         <PickPhoto class="btn outline sm" title={section === 'ingredients' ? 'New photo of the ingredients' : 'New photo of the method'} label="New photo"
-          onFile={(f) => setAgain({ only: section, file: f, start: null })} />
+          onFile={(f) => setAgain({ only: section, files: [f], start: null })} onFiles={(fs) => setAgain({ only: section, files: fs, start: null })} />
       </div>
     );
   }
@@ -218,12 +221,12 @@ function Form({ existing, household, say }) {
             <button class="btn outline" style="height:48px;padding:0 14px" disabled={!link.trim() || importing}>{importing ? 'Reading…' : 'Import'}</button>
           </div>
           <span class="cap">{importing ? 'Reading the recipe from the website…' : 'Tip: on a recipe website, tap Share → What\'s for Dinner? to do this in one step.'}</span>
-          <PickPhoto title="Photo of a recipe" label="Read a recipe from a photo" style="height:48px" onFile={setPageFile} />
+          <PickPhoto title="Photos of a recipe" label="Read a recipe from photos" style="height:48px" onFile={(f) => setPageFiles([f])} onFiles={setPageFiles} />
           <span class="cap">From a cookbook or recipe card. The text is read on this phone.</span>
         </form>
       )}
-      {pageFile && <PhotoImport file={pageFile} onDone={applyPhoto} onCancel={() => setPageFile(null)} />}
-      {again && <PhotoImport key={`${again.only}-${again.file.name}-${again.file.lastModified}`} file={again.file} only={again.only} start={again.start} onDone={applyPhoto} onCancel={() => setAgain(null)} />}
+      {pageFiles && <PhotoImport files={pageFiles} onDone={applyPhoto} onCancel={() => setPageFiles(null)} />}
+      {again && <PhotoImport key={`${again.only}-${again.files[0].name}-${again.files[0].lastModified}-${again.files.length}`} files={again.files} only={again.only} start={again.start} onDone={applyPhoto} onCancel={() => setAgain(null)} />}
 
       <form id="rf" onSubmit={save} style="display:flex;flex-direction:column;gap:16px">
         <div>

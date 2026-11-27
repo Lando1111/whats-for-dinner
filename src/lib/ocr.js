@@ -104,6 +104,7 @@ async function getWorker() {
  * Read each box. boxes: [{ kind, quad }]. onProgress({ stage: 'setup' | 'reading', index, total, progress })
  * Returns [{ kind, lines: [{ text, x0, x1, h, confidence }] }] in the same order.
  */
+// Each box can carry its own photo (for recipes over several pages); otherwise `photo` is used.
 export async function readBoxes(photo, boxes, onProgress = () => {}) {
   let current = { stage: 'setup', index: 0, total: boxes.length, progress: 0 };
   listener = (m) => {
@@ -119,7 +120,7 @@ export async function readBoxes(photo, boxes, onProgress = () => {}) {
     onProgress(current);
     const { kind, quad } = boxes[i];
     await worker.setParameters({ tessedit_pageseg_mode: kind === 'title' ? '6' : '4', preserve_interword_spaces: '1', user_defined_dpi: '300' });
-    const { data } = await worker.recognize(forReading(photo, quad), {}, { text: true, blocks: true });
+    const { data } = await worker.recognize(forReading(boxes[i].photo || photo, quad), {}, { text: true, blocks: true });
     const lines = [];
     for (const block of data.blocks || []) {
       for (const para of block.paragraphs || []) {

@@ -161,7 +161,7 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 .photo-import { gap: 10px; }
 .photo-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 8px; }
 .photo-wrap { position: relative; display: inline-block; line-height: 0; }
-.photo-wrap img { display: block; max-width: 100%; max-height: calc(100dvh - 290px); width: auto; height: auto; border-radius: 8px; user-select: none; -webkit-user-drag: none; }
+.photo-wrap img { display: block; max-width: 100%; max-height: calc(100dvh - 350px); width: auto; height: auto; border-radius: 8px; user-select: none; -webkit-user-drag: none; }
 .photo-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .quad { fill: rgba(242, 176, 138, .16); stroke: var(--apricot); stroke-linejoin: round; }
 .quad-g.on .quad { fill: rgba(242, 176, 138, .26); }
@@ -259,3 +259,9 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 .frac-keys { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; animation: rise-sm .15s ease-out; }
 .frac-keys button { min-width: 48px; min-height: 44px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 20px/1 var(--display); }
 .frac-keys button:active { background: var(--apricot); }
+
+/* Photo import: one chip per page */
+.pages { display: flex; gap: 8px; padding: 0 16px; overflow-x: auto; flex: none; position: relative; z-index: 1; }
+.pages .chipbtn { flex: none; gap: 6px; height: 44px; display: inline-flex; align-items: center; }
+.pages .count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; padding: 0 5px; }
+.pages .chipbtn.add { border-style: dashed; gap: 4px; }

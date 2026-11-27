@@ -68,7 +68,7 @@ export function headerTitle(d) {
 export function pizzaHat(d) {
   const sd = specialDay(d);
   if (sd === 'halloween') return 'pumpkin';
-  if (sd === 'christmas') return 'santa';
+  if (d.getMonth() === 11 && d.getDate() <= 25) return 'santa'; // 1–25 December
   if (isLateNight(d)) return 'nightcap';
   return null;
 }

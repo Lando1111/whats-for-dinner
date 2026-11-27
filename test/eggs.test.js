@@ -32,6 +32,10 @@ test('titles and hats follow the day and time', () => {
   assert.equal(headerTitle(at('2026-12-25T09:00')), "What's for Christmas lunch?");
   assert.equal(pizzaHat(at('2026-10-31T18:00')), 'pumpkin');
   assert.equal(pizzaHat(at('2026-12-24T18:00')), 'santa');
+  assert.equal(pizzaHat(at('2026-12-01T08:00')), 'santa');
+  assert.equal(pizzaHat(at('2026-12-25T23:30')), 'santa');
+  assert.equal(pizzaHat(at('2026-12-26T18:00')), null);
+  assert.equal(pizzaHat(at('2026-11-30T18:00')), null);
   assert.equal(pizzaHat(at('2026-11-27T23:30')), 'nightcap');
   assert.equal(pizzaHat(at('2026-11-27T18:00')), null);
 });

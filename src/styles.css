@@ -167,7 +167,8 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 .quad-g.on .quad { fill: rgba(242, 176, 138, .26); }
 .quad.other { fill: rgba(255, 255, 255, .12); stroke: var(--ls); stroke-dasharray: 8 6; pointer-events: none; }
 .quad-num { fill: var(--ink); font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: var(--raised); stroke-width: 4px; }
-.corner { cursor: grab; }
+.corner, .side { cursor: grab; }
+.side-bar { fill: var(--apricot); stroke: var(--raised); }
 .corner-hit { fill: transparent; }
 .corner-ring { fill: rgba(242, 176, 138, .18); stroke: var(--apricot); }
 .corner-dot { fill: var(--beet); }

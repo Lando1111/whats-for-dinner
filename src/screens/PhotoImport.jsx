@@ -10,7 +10,7 @@ import { PickPhoto } from '../PickPhoto.jsx';
 export const MAX_PAGES = 4; // each page is a big image in the phone's memory
 
 const STEPS = [
-  { key: 'ingredients', title: 'Ingredients', prompt: 'Drag the corners to fit around the ingredients. If they run into a second column or onto another page, add another box.', many: true },
+  { key: 'ingredients', title: 'Ingredients', prompt: 'Drag the corners or sides to fit around the ingredients. If they run into a second column or onto another page, add another box.', many: true },
   { key: 'method', title: 'Method', prompt: 'Now the method. Add a box for each column or panel, in reading order.', many: true, optional: true },
   { key: 'title', title: 'Name', prompt: "Box the recipe's name, or skip and type it in.", optional: true },
   { key: 'photo', title: 'Dish photo', prompt: 'Box the picture of the dish to use as the recipe photo.', optional: true }
@@ -108,12 +108,14 @@ export function PhotoImport({ file, files, onDone, onCancel, only = null, start 
     return [Math.max(0, Math.min(photo.width, p.x)), Math.max(0, Math.min(photo.height, p.y))];
   }
 
-  function down(e, boxIndex, corner) {
+  // corner: 0–3 moves one corner. side: 0–3 moves the side from corner `side` to the next one,
+  // straight in or out, so the box keeps its shape.
+  function down(e, boxIndex, corner, side = null) {
     e.preventDefault();
     e.stopPropagation();
     svgRef.current.setPointerCapture(e.pointerId);
     setActive(boxIndex);
-    drag.current = { boxIndex, corner, start: toImage(e), quad: list[boxIndex].q.map((p) => [...p]) };
+    drag.current = { boxIndex, corner, side, start: toImage(e), quad: list[boxIndex].q.map((p) => [...p]) };
   }
   function downOnPhoto(e) {
     const pt = toImage(e);
@@ -126,7 +128,20 @@ export function PhotoImport({ file, files, onDone, onCancel, only = null, start 
     const pt = toImage(e);
     const q = d.quad.map((p) => [...p]);
     if (d.corner != null) q[d.corner] = pt;
-    else {
+    else if (d.side != null) {
+      const a = d.quad[d.side], b = d.quad[(d.side + 1) % 4];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const nx = -(b[1] - a[1]) / len, ny = (b[0] - a[0]) / len; // at right angles to the side
+      let push = (pt[0] - d.start[0]) * nx + (pt[1] - d.start[1]) * ny;
+      // Stop at the photo's edge.
+      for (const p of [a, b]) {
+        if (nx) push = nx > 0 ? Math.min(push, (photo.width - p[0]) / nx) : Math.min(push, -p[0] / nx);
+        if (nx) push = nx > 0 ? Math.max(push, -p[0] / nx) : Math.max(push, (photo.width - p[0]) / nx);
+        if (ny) push = ny > 0 ? Math.min(push, (photo.height - p[1]) / ny) : Math.min(push, -p[1] / ny);
+        if (ny) push = ny > 0 ? Math.max(push, -p[1] / ny) : Math.max(push, (photo.height - p[1]) / ny);
+      }
+      for (const i of [d.side, (d.side + 1) % 4]) q[i] = [d.quad[i][0] + nx * push, d.quad[i][1] + ny * push];
+    } else {
       const dx = pt[0] - d.start[0]; const dy = pt[1] - d.start[1];
       for (const p of q) { p[0] = Math.max(0, Math.min(photo.width, p[0] + dx)); p[1] = Math.max(0, Math.min(photo.height, p[1] + dy)); }
     }
@@ -287,6 +302,18 @@ export function PhotoImport({ file, files, onDone, onCancel, only = null, start 
                       <g key={i} class={i === active ? 'quad-g on' : 'quad-g'}>
                         <polygon points={b.q.map((p) => p.join(',')).join(' ')} class="quad" style={`stroke-width:${3 * scale}`} />
                         {list.length > 1 && <text x={(b.q[0][0] + b.q[2][0]) / 2} y={(b.q[0][1] + b.q[2][1]) / 2} font-size={28 * scale} class="quad-num">{order.indexOf(i) + 1}</text>}
+                        {i === active && b.q.map((p, sd) => {
+                          const n = b.q[(sd + 1) % 4];
+                          const mx = (p[0] + n[0]) / 2, my = (p[1] + n[1]) / 2;
+                          const ang = (Math.atan2(n[1] - p[1], n[0] - p[0]) * 180) / Math.PI;
+                          return (
+                            <g class="side" onPointerDown={(e) => down(e, i, null, sd)} aria-label={`Side ${sd + 1}`}>
+                              <circle cx={mx} cy={my} r={r} class="corner-hit" />
+                              <rect x={mx - r * 0.7} y={my - r * 0.22} width={r * 1.4} height={r * 0.44} rx={r * 0.22} class="side-bar"
+                                transform={`rotate(${ang} ${mx} ${my})`} style={`stroke-width:${2 * scale}`} />
+                            </g>
+                          );
+                        })}
                         {i === active && b.q.map((p, c) => (
                           <g class="corner" onPointerDown={(e) => down(e, i, c)} aria-label={`Corner ${c + 1}`}>
                             <circle cx={p[0]} cy={p[1]} r={r} class="corner-hit" />

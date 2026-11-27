@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
+import { eggsOn } from './lib/eggs.js';
+import { secret } from './lib/trophies.js';
+import { Peekaboo } from './Eggs.jsx';
 import { supabase, friendly } from './lib/supabase.js';
 import { useRoute, go } from './lib/router.js';
 import { Icon } from './icons.jsx';
@@ -32,6 +35,8 @@ export function App() {
   const [member, setMember] = useState(undefined); // undefined = loading, null = not in a household
   const [memberships, setMemberships] = useState([]);
   const [toast, setToast] = useState(null);
+  const [peek] = useState(() => eggsOn() && Math.random() < 1 / 40); // now and then the pizza peeks out
+  const [peekReady, setPeekReady] = useState(false);
 
   const say = useCallback((text, err = false) => {
     setToast({ text, err });
@@ -87,6 +92,7 @@ export function App() {
   }
 
   const showTabs = session && member && !['recipe', 'build'].includes(route.name);
+  useEffect(() => { if (peek && showTabs && !peekReady) { const t = setTimeout(() => setPeekReady(true), 1500); return () => clearTimeout(t); } }, [peek, showTabs]);
   const current = route.name === 'household' ? 'settings' : route.name;
   useEffect(() => { if (!session) clearRecipeCache(); }, [session]);
   return (
@@ -103,6 +109,7 @@ export function App() {
           </nav>
         </div>
       )}
+      {peekReady && showTabs && <Peekaboo onCatch={() => { say('Caught me!'); secret('peekaboo', say); }} />}
       {toast && <div class={`toast${toast.err ? ' err' : ''}`} role="status">{toast.text}</div>}
     </div>
   );

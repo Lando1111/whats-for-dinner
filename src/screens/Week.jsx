@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { supabase, friendly } from '../lib/supabase.js';
 import { useRecipes, usePhotoUrls, isoDate, fromIso, EXTRAS_NAME } from '../lib/data.js';
 import { loadPlan, planRecipe, clearNight, updateNight, upsertNight, setLeftoverNights, pickRecipe, planFill, weekDatesFrom, loadExtras, addExtra, updateExtra, removeExtra } from '../lib/plan.js';
@@ -6,7 +6,15 @@ import { Recipes } from './Recipes.jsx';
 import { Icon } from '../icons.jsx';
 import { HouseholdSwitch, HouseholdChip } from './HouseholdSwitch.jsx';
 import { confetti, buzz, motionOn } from '../lib/motion.js';
+import { TROPHIES, eggsOn, headerTitle, pizzaHat, isUfoHour, specialDay, shroveTuesday, isEasterWeekend, easterEggDates, anniversary, lastYearIso, DEFAULT_TITLE } from '../lib/eggs.js';
+import { checkTrophies, secret } from '../lib/trophies.js';
+import { useNow, PizzaMark, Ufo, Snow, EasterEgg } from '../Eggs.jsx';
 
+const EGG_COLOURS = ['#f2b08a', '#b9d3a6', '#aed0d4', '#f4d77f'];
+const readList = (k) => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch { return []; } };
+const writeList = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } };
+
+const TROPHY_NAME = Object.fromEntries(TROPHIES.map((t) => [t.id, t.name]));
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -32,6 +40,11 @@ export function Week({ household, member, say, memberships, userId }) {
   const [extras, setExtras] = useState([]);
   const [pickingExtra, setPickingExtra] = useState(false);
   const [fresh, setFresh] = useState({}); // date → order, for nights Fill the week just planned
+  const now = useNow();
+  const eggs = eggsOn();
+  const [history, setHistory] = useState(null); // every planned night, for trophies and the anniversary card
+  const [annivHidden, setAnnivHidden] = useState(false);
+  const [eggsFound, setEggsFound] = useState(() => readList(`wfd-easter-${now.getFullYear()}`));
 
   const start = weekStart(offset);
   const dates = weekDatesFrom(start);
@@ -62,6 +75,49 @@ export function Week({ household, member, say, memberships, userId }) {
   const byDate = useMemo(() => Object.fromEntries(plan.map((p) => [p.date, p])), [plan]);
   const rById = useMemo(() => Object.fromEntries((recipes || []).map((r) => [r.id, r])), [recipes]);
   const urls = usePhotoUrls([...plan, ...extras].map((p) => rById[p.recipe_id]?.photo_path));
+  // Trophies: worked out from the plan when the Week screen opens and after Fill the week.
+  const trophies = useCallback(async () => {
+    try {
+      const { plan: all, fresh: news } = await checkTrophies(household, recipes);
+      setHistory(all);
+      if (news.length && eggsOn()) {
+        const names = news.map((id) => TROPHY_NAME[id]).filter(Boolean);
+        say(names.length === 1 ? `Trophy unlocked: ${names[0]}` : `${names.length} trophies unlocked: ${names.join(', ')}`);
+      }
+    } catch { /* offline: try next time */ }
+  }, [household.id, recipes]);
+  const checked = useRef(false);
+  useEffect(() => { if (recipes && !checked.current) { checked.current = true; trophies(); } }, [recipes, trophies]);
+
+  const ufo = eggs && isUfoHour(now);
+  useEffect(() => { if (ufo && motionOn()) secret('night_owl', say); }, [ufo]);
+
+  const years = anniversary(household.created_at, now);
+  const annivKey = `wfd-anniv-${household.id}-${years}`;
+  const showAnniv = years > 0 && history && !annivHidden && !readList(annivKey).length;
+  const annivStats = useMemo(() => {
+    if (!showAnniv) return null;
+    const cooks = history.filter((p) => p.kind === 'cook' && p.recipe_id);
+    const tally = {};
+    for (const p of cooks) tally[p.recipe_id] = (tally[p.recipe_id] || 0) + 1;
+    const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+    return { dinners: cooks.length, top: top && rById[top[0]] ? { title: rById[top[0]].title, n: top[1] } : null };
+  }, [showAnniv, history, rById]);
+
+  const shrove = isoDate(shroveTuesday(start.getFullYear()));
+  const hunt = eggs && offset === 0 && isEasterWeekend(now) ? easterEggDates(dates, now.getFullYear()) : [];
+  function findEgg(iso) {
+    const key = `wfd-easter-${now.getFullYear()}`;
+    const next = [...new Set([...eggsFound, iso])];
+    setEggsFound(next); writeList(key, next);
+    buzz(12);
+    if (hunt.every((d) => next.includes(d))) {
+      confetti({ shape: 'egg' });
+      say('You found all the eggs! Happy Easter.');
+      secret('egg_hunt', say);
+    }
+  }
+
   const extraRun = async (fn) => { try { await fn(); await load(); } catch (e) { say(friendly(e), true); } };
 
   async function fill(e) {
@@ -78,6 +134,7 @@ export function Week({ household, member, say, memberships, userId }) {
         buzz(15);
         // Whole week planned: a small burst from the tile.
         if (picks.length >= emptyFuture) confetti({ x: box.left + box.width / 2, y: box.top + box.height / 2, count: 70, spread: 100, duration: 2000 });
+        trophies();
       }
       say(picks.length ? `Filled ${picks.length} ${picks.length === 1 ? 'night' : 'nights'}. Tap any night to change it.` : 'No empty nights left to fill.');
     } catch (e) { say(friendly(e), true); }
@@ -91,10 +148,22 @@ export function Week({ household, member, say, memberships, userId }) {
 
   return (
     <main class="main">
-      <header class="row-head">
-        <img src={`${import.meta.env.BASE_URL}icons/pizza-mark.svg`} alt="" width="36" height="36" />
-        <h1 class="title">What's for Dinner?</h1>
+      <header class="row-head" style="position:relative">
+        <PizzaMark hat={eggs ? pizzaHat(now) : null} />
+        <h1 class="title">{eggs ? headerTitle(now) : DEFAULT_TITLE}</h1>
+        {ufo && <Ufo />}
       </header>
+      {eggs && specialDay(now) === 'christmas' && <Snow />}
+      {showAnniv && (
+        <div class="card pop" style="padding:14px 16px;background:var(--butter);display:flex;gap:12px;align-items:flex-start">
+          <Icon name="trophy" size={28} />
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <strong style="font:600 18px/24px var(--display)">{years === 1 ? 'One year' : `${years} years`} of dinners!</strong>
+            <span>{annivStats.dinners} dinners planned so far.{annivStats.top ? ` Most cooked: ${annivStats.top.title} (${annivStats.top.n === 1 ? 'once' : `${annivStats.top.n} times`}).` : ''}</span>
+          </div>
+          <button class="icon-btn" aria-label="Close" onClick={() => { writeList(annivKey, [1]); setAnnivHidden(true); }}><Icon name="close" size={18} /></button>
+        </div>
+      )}
       <HouseholdChip memberships={memberships} household={household} onOpen={() => setSwitching(true)} />
       {switching && <HouseholdSwitch memberships={memberships} current={household.id} userId={userId} onClose={() => setSwitching(false)} say={say} />}
       <div class="row-head" style="gap:4px">
@@ -116,9 +185,11 @@ export function Week({ household, member, say, memberships, userId }) {
           const kind = !p ? 'empty' : p.kind === 'leftovers' ? 'left' : p.kind;
           const src = p?.leftovers_from_id && plan.find((x) => x.id === p.leftovers_from_id);
           const title = !p ? 'Nothing planned' : p.kind === 'out' ? 'Out for dinner' : p.kind === 'leftovers' ? `Leftovers: ${r?.title || 'meal'}` : r?.title || 'Recipe removed';
-          const sub = !p ? (canEdit && !past ? 'Tap to choose' : '') : p.kind === 'out' ? p.note || '' : p.kind === 'leftovers' ? (src ? `From ${LONG[fromIso(src.date).getDay()]}` : '') : [p.locked && 'Locked', p.makes_leftovers && 'Makes leftovers'].filter(Boolean).join(' · ');
+          const sub = !p ? (canEdit && !past ? (eggs && iso === shrove ? 'Pancakes?' : 'Tap to choose') : '') : p.kind === 'out' ? p.note || '' : p.kind === 'leftovers' ? (src ? `From ${LONG[fromIso(src.date).getDay()]}` : '') : [p.locked && 'Locked', p.makes_leftovers && 'Makes leftovers'].filter(Boolean).join(' · ');
           const photo = r?.photo_path && urls[r.photo_path];
+          const egg = hunt.includes(iso) && !eggsFound.includes(iso);
           return (
+            <div class="tile-wrap">
             <button class={`tile ${kind === 'empty' ? '' : kind}${isToday ? ' today' : ''}${past ? ' past' : ''}${fresh[iso] != null ? ' pop' : ''}`}
               style={fresh[iso] != null ? `animation-delay:${fresh[iso] * 70}ms` : ''}
               aria-label={`${LONG[fromIso(iso).getDay()]} ${fromIso(iso).getDate()}: ${title}`}
@@ -133,6 +204,8 @@ export function Week({ household, member, say, memberships, userId }) {
                 <span class="cap" style={kind === 'left' ? 'color:var(--ink)' : ''}>{sub}</span>
               </div>
             </button>
+            {egg && <EasterEgg colour={EGG_COLOURS[hunt.indexOf(iso)]} onFind={() => findEgg(iso)} />}
+            </div>
           );
         })}
         <button class="tile fill" disabled={!canEdit || busy || !emptyFuture} onClick={fill}>
@@ -195,6 +268,8 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
   const [picking, setPicking] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [surprised, setSurprised] = useState(false);
+  const [golden, setGolden] = useState(false);
+  const [lastYear, setLastYear] = useState(null);
   const [note, setNote] = useState(row?.note || '');
   const urls = usePhotoUrls([recipe?.photo_path]);
   const d = fromIso(date);
@@ -206,15 +281,44 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
 
   const choose = (r) => run(() => planRecipe(household.id, date, r, { multiplier: row?.multiplier || 1, existing: row?.kind === 'cook' ? row : null }));
 
+  // Same night last year (52 weeks ago, so the same day of the week).
+  useEffect(() => {
+    let live = true;
+    supabase.from('meal_plan').select('kind, recipe_id').eq('household_id', household.id).eq('date', lastYearIso(date)).limit(1).maybeSingle()
+      .then(({ data }) => { if (live && data?.recipe_id) setLastYear(data); }, () => {});
+    return () => { live = false; };
+  }, [date, household.id]);
+
   function surprise() {
     const avoid = new Set([...recent, ...plan.filter((p) => p.recipe_id && p.date !== date).map((p) => p.recipe_id), row?.recipe_id].filter(Boolean));
     const needLeftovers = (household.settings?.leftover_weekdays || []).includes(d.getDay());
     const r = pickRecipe(recipes, { date, avoid, needLeftovers, weekendDays: household.settings?.weekend_weekdays });
     if (!r) return say('Add some recipes first.', true);
-    if (!motionOn()) return choose(r);
+    const lucky = eggsOn() && Math.random() < 1 / 25; // now and then it's a golden Chef's pick
+    const done = () => { setGolden(lucky); if (lucky) secret('chefs_pick', say); };
+    if (!motionOn()) return choose(r).then(done);
     setRolling(true);
-    setTimeout(async () => { await choose(r); setRolling(false); setSurprised(true); buzz(12); }, 450);
+    setTimeout(async () => { await choose(r); setRolling(false); setSurprised(true); done(); buzz(lucky ? [15, 40, 15] : 12); }, 450);
   }
+
+  // Shake the phone to Surprise me (only while this night is open).
+  const surpriseRef = useRef(surprise);
+  surpriseRef.current = surprise;
+  useEffect(() => {
+    if (!eggsOn() || picking || row?.kind === 'out' || typeof DeviceMotionEvent === 'undefined') return;
+    let hits = [], last = 0;
+    const onMotion = (e) => {
+      const a = e.acceleration?.x != null ? e.acceleration : null;
+      if (!a) return;
+      const force = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
+      const t = Date.now();
+      if (force < 15 || t - last < 1500) return;
+      hits = hits.filter((h) => t - h < 700).concat(t);
+      if (hits.length >= 2) { last = t; hits = []; secret('shake', say); surpriseRef.current(); }
+    };
+    addEventListener('devicemotion', onMotion);
+    return () => removeEventListener('devicemotion', onMotion);
+  }, [picking, row?.kind]);
 
   async function setOut(on) {
     if (on) {
@@ -258,11 +362,18 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
           </div>
 
           {row?.kind === 'cook' && recipe && (
-            <a key={recipe.id} href={`#/recipe/${recipe.id}`} class={`listrow${surprised ? ' pop' : ''}`} style="min-height:72px;background:var(--surface);border-radius:16px;padding:8px;border:0">
+            <a key={recipe.id} href={`#/recipe/${recipe.id}`} class={`listrow${surprised ? ' pop' : ''}${golden ? ' golden' : ''}`} style="min-height:72px;background:var(--surface);border-radius:16px;padding:8px;border:0;position:relative">
+              {golden && <span class="chef-stamp">Chef's pick</span>}
               {urls[recipe.photo_path] ? <img class="thumb" style="width:72px;height:56px" src={urls[recipe.photo_path]} alt="" /> : <span class="thumb" style="width:72px;height:56px;background:var(--duck);display:flex;align-items:center;justify-content:center"><Icon name="bowl" /></span>}
               <span style="display:flex;flex-direction:column"><span style="font-weight:700">{recipe.title}</span><span class="cap">Tap to open the recipe</span></span>
               <span style="margin-left:auto"><Icon name="next" size={20} /></span>
             </a>
+          )}
+          {lastYear && lastYear.recipe_id !== row?.recipe_id && rById[lastYear.recipe_id] && (
+            <div class="cap" style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:20px">
+              <span style="flex:1">This night last year: <strong style="color:var(--ink)">{lastYear.kind === 'leftovers' ? 'Leftovers: ' : ''}{rById[lastYear.recipe_id].title}</strong></span>
+              {row?.kind !== 'out' && <button class="link" style="padding:0 4px" onClick={() => choose(rById[lastYear.recipe_id])}>Have it again</button>}
+            </div>
           )}
           {row?.kind === 'leftovers' && (
             <p style="margin:0;padding:12px;border-radius:16px;background:var(--butter)"><strong>Leftovers: {recipe?.title || 'meal'}</strong>{leftoverDate ? <span> from {LONG[fromIso(leftoverDate.date).getDay()]}</span> : null}. Nothing to buy for tonight.</p>

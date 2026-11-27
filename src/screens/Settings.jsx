@@ -2,7 +2,10 @@ import { DEFAULT_WEEKEND } from '../lib/data.js';
 import { useState } from 'preact/hooks';
 import { supabase, friendly } from '../lib/supabase.js';
 import { getTheme, setTheme } from '../lib/theme.js';
-import { getMotion, setMotion } from '../lib/motion.js';
+import { getMotion, setMotion, confetti } from '../lib/motion.js';
+import { eggsOn, setEggs, isHeadChef, setHeadChef, seenTrophies, foundSecrets } from '../lib/eggs.js';
+import { secret } from '../lib/trophies.js';
+import { TrophyCabinet } from '../Eggs.jsx';
 import { HouseholdSwitch } from './HouseholdSwitch.jsx';
 import { Icon } from '../icons.jsx';
 
@@ -32,6 +35,26 @@ export function Settings({ member, household, reload, say, memberships, userId }
   const [switching, setSwitching] = useState(false);
   const [theme, setThemeState] = useState(getTheme());
   const [motion, setMotionState] = useState(getMotion());
+  const [eggs, setEggsState] = useState(eggsOn());
+  const [cabinet, setCabinet] = useState(false);
+  const [taps, setTaps] = useState(0);
+  const trophyCount = seenTrophies(household.id).size + foundSecrets().size;
+
+  // Like Android's hidden developer options: tap the version seven times.
+  function tapVersion() {
+    if (!eggsOn()) return;
+    const n = taps + 1;
+    setTaps(n);
+    if (n >= 3 && n < 7) say(`${7 - n} more ${7 - n === 1 ? 'tap' : 'taps'} to become head chef`);
+    if (n === 7) {
+      setTaps(0);
+      if (isHeadChef()) { setHeadChef(false); say('Back to regular confetti.'); return; }
+      setHeadChef(true);
+      confetti();
+      say("You're now head chef! Confetti is pizza from now on.");
+      secret('head_chef', say, 3000);
+    }
+  }
   const isOwner = member.role === 'owner';
   const s = household.settings || {};
   const units = s.unit_prefs || { dry: 'g', liquid: 'ml', butter: 'g' };
@@ -115,15 +138,27 @@ export function Settings({ member, household, reload, say, memberships, userId }
         <h2 class="lbl">Appearance</h2>
         <div class="card">
           <div class="row"><span>Theme</span><Seg label="Theme" options={[['light', 'Light'], ['dark', 'Dark'], ['phone', 'Phone']]} value={theme} onChange={(v) => { setTheme(v); setThemeState(v); }} /></div>
-          <div class="srow" style="border-bottom:0">
+          <div class="srow">
             <span style="display:flex;flex-direction:column"><span>Animations</span><span class="cap">Confetti and little movements on this phone. Off if your phone is set to remove animations.</span></span>
             <button class="switch" role="switch" aria-checked={motion ? 'true' : 'false'} aria-label="Animations" onClick={() => { setMotion(!motion); setMotionState(!motion); }} />
+          </div>
+          <div class="srow" style="border-bottom:0">
+            <span style="display:flex;flex-direction:column"><span>Easter eggs</span><span class="cap">Hidden surprises, secret words and trophy alerts on this phone</span></span>
+            <button class="switch" role="switch" aria-checked={eggs ? 'true' : 'false'} aria-label="Easter eggs" onClick={() => { setEggs(!eggs); setEggsState(!eggs); }} />
           </div>
         </div>
       </section>
 
+      {trophyCount > 0 && (
+        <button class="card row" style="width:100%;border:0;text-align:left;color:var(--ink);padding:0 12px" onClick={() => setCabinet(true)}>
+          <Icon name="trophy" /><span style="display:flex;flex-direction:column"><span>Trophy cabinet</span><span class="cap">{trophyCount} found so far</span></span>
+          <span style="margin-left:auto;color:var(--beet)"><Icon name="next" size={18} stroke={2.4} /></span>
+        </button>
+      )}
+      {cabinet && <TrophyCabinet household={household} onClose={() => setCabinet(false)} />}
+
       <button class="link" style="align-self:center" onClick={() => supabase.auth.signOut()}>Sign out</button>
-      <p class="cap" style="text-align:center;margin:0">Version {__VERSION__}</p>
+      <p class="cap" style="text-align:center;margin:0;user-select:none" onClick={tapVersion}>Version {__VERSION__}</p>
     </main>
   );
 }

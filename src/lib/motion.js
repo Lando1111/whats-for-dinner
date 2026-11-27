@@ -1,4 +1,6 @@
 // Animations: on unless this person turns them off in Settings, or their phone asks for less motion.
+import { isHeadChef } from './eggs.js';
+
 const KEY = 'wfd-motion';
 
 export function getMotion() {
@@ -30,9 +32,11 @@ export function buzz(pattern) {
 const COLOURS = ['--apricot', '--beet', '--sage', '--butter', '--duck'];
 
 // Confetti from the bottom-centre of the screen (or from a point), drawn on a throwaway canvas.
-// Pieces are paper strips and dots in the Hearth colours; it cleans up after itself.
-export function confetti({ x, y, count = 140, spread = 70, duration = 2600 } = {}) {
+// Pieces are paper strips and dots in the Hearth colours (or pizza slices / eggs); it cleans up after itself.
+export function confetti({ x, y, count = 140, spread = 70, duration = 2600, shape } = {}) {
   if (!motionOn() || typeof document === 'undefined') return;
+  shape = shape || (isHeadChef() ? 'pizza' : 'paper');
+  if (shape !== 'paper') count = Math.round(count * 0.5);
   const css = getComputedStyle(document.documentElement);
   const colours = COLOURS.map((c) => css.getPropertyValue(c).trim()).filter(Boolean);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -53,7 +57,7 @@ export function confetti({ x, y, count = 140, spread = 70, duration = 2600 } = {
     return {
       x: ox + (Math.random() - 0.5) * 40, y: oy,
       vx: Math.cos(angle) * speed * 9, vy: Math.sin(angle) * speed * 14,
-      size: 6 + Math.random() * 6, dot: Math.random() < 0.3,
+      size: (shape === 'paper' ? 6 : 14) + Math.random() * 6, dot: Math.random() < 0.3,
       spin: Math.random() * Math.PI, vspin: (Math.random() - 0.5) * 0.35,
       tilt: Math.random() * Math.PI, vtilt: 0.05 + Math.random() * 0.1,
       colour: colours[Math.floor(Math.random() * colours.length)] || '#f2b08a'
@@ -77,11 +81,23 @@ export function confetti({ x, y, count = 140, spread = 70, duration = 2600 } = {
       ctx.fillStyle = p.colour;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.spin);
-      if (p.dot) { ctx.beginPath(); ctx.arc(0, 0, p.size / 2.4, 0, Math.PI * 2); ctx.fill(); }
+      if (shape === 'pizza') slice(ctx, p.size, css);
+      else if (shape === 'egg') { ctx.beginPath(); ctx.ellipse(0, 0, p.size * 0.36, p.size * 0.48, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-p.size * 0.36, -p.size * 0.05, p.size * 0.72, p.size * 0.12); }
+      else if (p.dot) { ctx.beginPath(); ctx.arc(0, 0, p.size / 2.4, 0, Math.PI * 2); ctx.fill(); }
       else ctx.fillRect(-p.size / 2, -p.size / 4 * Math.abs(Math.cos(p.tilt)), p.size, (p.size / 2) * Math.abs(Math.cos(p.tilt)) + 1);
       ctx.restore();
     }
     if (t < duration) requestAnimationFrame(frame); else canvas.remove();
   }
   requestAnimationFrame(frame);
+}
+
+// A little pizza slice: crust, cheese, two pepperoni.
+function slice(ctx, s, css) {
+  const v = (n, f) => css.getPropertyValue(n).trim() || f;
+  ctx.beginPath(); ctx.moveTo(-s / 2, -s / 2); ctx.lineTo(s / 2, -s / 2); ctx.lineTo(0, s / 2); ctx.closePath();
+  ctx.fillStyle = v('--butter', '#f4d77f'); ctx.fill();
+  ctx.fillStyle = v('--apricot', '#f2b08a'); ctx.fillRect(-s / 2, -s / 2 - s * 0.12, s, s * 0.16);
+  ctx.fillStyle = v('--beet', '#8a2f52');
+  ctx.beginPath(); ctx.arc(-s * 0.12, -s * 0.12, s * 0.09, 0, Math.PI * 2); ctx.arc(s * 0.1, s * 0.05, s * 0.08, 0, Math.PI * 2); ctx.fill();
 }

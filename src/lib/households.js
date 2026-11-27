@@ -10,7 +10,7 @@ export const ROLE_LABEL = { owner: 'Owner', full: 'Full access', shopping: 'Shop
 export async function loadMemberships(userId) {
   const [{ data, error }, { data: pref }] = await Promise.all([
     supabase.from('household_members')
-      .select('household_id, role, display_name, joined_at, households(id, name, settings)')
+      .select('household_id, role, display_name, joined_at, households(id, name, settings, created_at)')
       .eq('user_id', userId)
       .order('joined_at'),
     supabase.from('user_prefs').select('active_household_id').eq('user_id', userId).maybeSingle()

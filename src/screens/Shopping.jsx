@@ -10,6 +10,8 @@ import { parseIngredient } from '../lib/parse.js';
 import { formatAmount } from '../lib/units.js';
 import { Icon } from '../icons.jsx';
 import { confetti, buzz, motionOn } from '../lib/motion.js';
+import { eggsOn, secretWord } from '../lib/eggs.js';
+import { secret } from '../lib/trophies.js';
 
 const UNDO_MS = 5000;
 const LEAVE_MS = 280; // ticked rows slide away before they move to Bought
@@ -33,6 +35,7 @@ export function Shopping({ household, say, userId, memberships }) {
   const [edit, setEdit] = useState(null);
   const [note, setNote] = useState('');
   const timers = useRef({});
+  const [magic, setMagic] = useState(false); // 'abracadabra': the list shuffles and settles back
 
   const load = useCallback(async () => {
     try {
@@ -65,7 +68,7 @@ export function Shopping({ household, say, userId, memberships }) {
     setPending((p) => ({ ...p, [item.id]: true }));
     setSnack({ item, at: Date.now() });
     const last = toBuy.length > 0 && toBuy.every((i) => i.id === item.id || pending[i.id]);
-    if (last) { setCheer(true); confetti(); buzz([20, 60, 40]); } else buzz(10);
+    if (last) { setCheer(true); confetti(); buzz([20, 60, 40]); secret('clean_sweep', say, 5600); } else buzz(10);
     timers.current[item.id] = setTimeout(() => {
       const archive = () => {
         delete timers.current[item.id];
@@ -92,6 +95,19 @@ export function Shopping({ household, say, userId, memberships }) {
 
   function add(e) {
     e.preventDefault();
+    const word = eggsOn() && secretWord(text);
+    if (word) {
+      setText('');
+      if (word === 'rain') { confetti(); say('Make it rain!'); }
+      if (word === 'pizza') { confetti({ shape: 'pizza' }); say('Pizza party!'); }
+      if (word === 'shuffle') {
+        if (motionOn()) { setMagic(true); setTimeout(() => setMagic(false), 1100); }
+        say('Abracadabra! Back in aisle order.');
+      }
+      buzz(15);
+      secret('magic_words', say);
+      return;
+    }
     const p = parseIngredient(text);
     if (!p) return;
     const name = p.note && !p.quantity ? `${p.name}` : p.name;
@@ -170,7 +186,7 @@ export function Shopping({ household, say, userId, memberships }) {
               </div>
             )
           ) : [<div class="row-head" style="gap:8px;flex-wrap:wrap"><p class="cap" style="margin:0;flex:1;min-width:180px">In the wrong part of the shop? Tap the item to move it.</p><button class="link" style="min-height:44px" onClick={() => setAisles(true)}>Aisle order</button></div>, ...groups.map((g) => (
-            <section>
+            <section class={magic ? 'magic' : ''}>
               <h2 class="lbl">{g.label}</h2>
               <ul class="card shop">
                 {g.items.map((i) => (

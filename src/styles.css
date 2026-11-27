@@ -186,3 +186,6 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 .aisle-name { flex: 1; font-weight: 700; }
 .grip { width: 44px; height: 52px; display: grid; place-items: center; color: var(--muted); cursor: grab; touch-action: none; }
 .aisle .icon-btn:disabled { opacity: .3; }
+
+/* Open household, shown for people in more than one */
+.house-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid var(--duck); background: var(--raised); color: var(--ink); font: 700 15px/1 var(--body); }

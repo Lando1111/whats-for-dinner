@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { supabase, friendly, APP_URL } from '../lib/supabase.js';
 import { Icon } from '../icons.jsx';
+import { clearCache } from '../lib/shopping.js';
+import { clearRecipeCache } from '../lib/data.js';
 
 const ROLE_TEXT = { owner: 'Owner · can manage people', full: 'Full access', shopping: 'Shopping only' };
 const AV_BG = ['var(--apricot)', 'var(--sage)', 'var(--duck)', 'var(--butter)'];
@@ -21,7 +23,7 @@ export function Household({ member, household, reload, say, userId }) {
   const [shareLink, setShareLink] = useState(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from('household_members').select('user_id, display_name, role, joined_at').order('joined_at');
+    const { data, error } = await supabase.from('household_members').select('user_id, display_name, role, joined_at').eq('household_id', household.id).order('joined_at');
     if (error) return say(friendly(error), true);
     setPeople(data);
     if (isOwner) {
@@ -59,10 +61,13 @@ export function Household({ member, household, reload, say, userId }) {
   }
 
   async function leave() {
-    const { error } = await supabase.from('household_members').delete().eq('user_id', userId);
+    const { error } = await supabase.from('household_members').delete().eq('household_id', household.id).eq('user_id', userId);
     if (error) return say(friendly(error), true);
+    // Start fresh in whichever household is left (or set-up if none).
+    clearCache();
+    clearRecipeCache();
     location.hash = '#/week';
-    reload();
+    location.reload();
   }
 
   return (
@@ -106,10 +111,10 @@ export function Household({ member, household, reload, say, userId }) {
                 {canManage && open === p.user_id && (
                   <div style="margin:0 0 8px 52px;display:flex;flex-direction:column;align-items:flex-start;gap:4px">
                     <div class="seg" role="group" aria-label={`${p.display_name}'s access`} style="width:100%">
-                      <button aria-pressed={p.role === 'full' ? 'true' : 'false'} onClick={() => act(supabase.from('household_members').update({ role: 'full' }).eq('user_id', p.user_id))}>Full access</button>
-                      <button aria-pressed={p.role === 'shopping' ? 'true' : 'false'} onClick={() => act(supabase.from('household_members').update({ role: 'shopping' }).eq('user_id', p.user_id))}>Shopping only</button>
+                      <button aria-pressed={p.role === 'full' ? 'true' : 'false'} onClick={() => act(supabase.from('household_members').update({ role: 'full' }).eq('household_id', household.id).eq('user_id', p.user_id))}>Full access</button>
+                      <button aria-pressed={p.role === 'shopping' ? 'true' : 'false'} onClick={() => act(supabase.from('household_members').update({ role: 'shopping' }).eq('household_id', household.id).eq('user_id', p.user_id))}>Shopping only</button>
                     </div>
-                    <button class="link" style="padding:0" onClick={() => { if (window.confirm(`Remove ${p.display_name || 'this person'} from ${household.name}?`)) act(supabase.from('household_members').delete().eq('user_id', p.user_id), 'Removed from the household'); }}>Remove from household</button>
+                    <button class="link" style="padding:0" onClick={() => { if (window.confirm(`Remove ${p.display_name || 'this person'} from ${household.name}?`)) act(supabase.from('household_members').delete().eq('household_id', household.id).eq('user_id', p.user_id), 'Removed from the household'); }}>Remove from household</button>
                   </div>
                 )}
               </div>

@@ -2,6 +2,7 @@ import { DEFAULT_WEEKEND } from '../lib/data.js';
 import { useState } from 'preact/hooks';
 import { supabase, friendly } from '../lib/supabase.js';
 import { getTheme, setTheme } from '../lib/theme.js';
+import { HouseholdSwitch } from './HouseholdSwitch.jsx';
 import { Icon } from '../icons.jsx';
 
 const WEEKDAYS = [['M', 'Monday', 1], ['T', 'Tuesday', 2], ['W', 'Wednesday', 3], ['T', 'Thursday', 4], ['F', 'Friday', 5], ['S', 'Saturday', 6], ['S', 'Sunday', 0]];
@@ -26,7 +27,8 @@ function Stepper({ label, value, min, max, unit, onChange, disabled }) {
   );
 }
 
-export function Settings({ member, household, reload, say }) {
+export function Settings({ member, household, reload, say, memberships, userId }) {
+  const [switching, setSwitching] = useState(false);
   const [theme, setThemeState] = useState(getTheme());
   const isOwner = member.role === 'owner';
   const s = household.settings || {};
@@ -52,7 +54,12 @@ export function Settings({ member, household, reload, say }) {
             <span style="display:flex;flex-direction:column"><span>{household.name}</span><span class="cap">People, invites and access</span></span>
             <span style="margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--beet);font-weight:700;font-size:15px">Manage<Icon name="next" size={18} stroke={2.4} /></span>
           </a>
+          <button class="row" style="width:100%;background:none;border:0;border-top:1px solid var(--line);text-align:left;color:var(--ink);min-height:56px" onClick={() => setSwitching(true)}>
+            <span style="display:flex;flex-direction:column"><span>Your households</span><span class="cap">{memberships.length > 1 ? `Switch between your ${memberships.length} households` : 'Start your own, or join another as a shopper'}</span></span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--beet);font-weight:700;font-size:15px">{memberships.length > 1 ? 'Switch' : 'Open'}<Icon name="next" size={18} stroke={2.4} /></span>
+          </button>
         </div>
+        {switching && <HouseholdSwitch memberships={memberships} current={household.id} userId={userId} onClose={() => setSwitching(false)} say={say} />}
       </section>
 
       <section>

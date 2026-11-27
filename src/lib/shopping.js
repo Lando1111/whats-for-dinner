@@ -63,3 +63,5 @@ export async function flush() {
 }
 
 export function updateCache(fn) { write(CACHE, fn(cachedItems())); }
+// Forget the cached list (when another household is opened).
+export function clearCache() { try { localStorage.removeItem(CACHE); } catch { /* ignore */ } }

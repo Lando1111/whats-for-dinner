@@ -4,6 +4,7 @@ import { useRecipes, usePhotoUrls, isoDate, fromIso, EXTRAS_NAME } from '../lib/
 import { loadPlan, planRecipe, clearNight, updateNight, upsertNight, setLeftoverNights, pickRecipe, planFill, weekDatesFrom, loadExtras, addExtra, updateExtra, removeExtra } from '../lib/plan.js';
 import { Recipes } from './Recipes.jsx';
 import { Icon } from '../icons.jsx';
+import { HouseholdSwitch, HouseholdChip } from './HouseholdSwitch.jsx';
 
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -18,7 +19,8 @@ export function weekStart(offsetWeeks = 0) {
 
 const dayLabel = (iso) => { const d = fromIso(iso); return `${DAY[d.getDay()]} ${d.getDate()}`; };
 
-export function Week({ household, member, say }) {
+export function Week({ household, member, say, memberships, userId }) {
+  const [switching, setSwitching] = useState(false);
   const canEdit = member.role !== 'shopping';
   const recipes = useRecipes();
   const [offset, setOffset] = useState(0);
@@ -83,6 +85,8 @@ export function Week({ household, member, say }) {
         <img src={`${import.meta.env.BASE_URL}icons/pizza-mark.svg`} alt="" width="36" height="36" />
         <h1 class="title">What's for Dinner?</h1>
       </header>
+      <HouseholdChip memberships={memberships} household={household} onOpen={() => setSwitching(true)} />
+      {switching && <HouseholdSwitch memberships={memberships} current={household.id} userId={userId} onClose={() => setSwitching(false)} say={say} />}
       <div class="row-head" style="gap:4px">
         <button class="icon-btn" aria-label="Previous week" onClick={() => setOffset(offset - 1)}><Icon name="back" /></button>
         <div style="display:flex;flex-direction:column">

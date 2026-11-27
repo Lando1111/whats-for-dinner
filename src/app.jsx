@@ -13,6 +13,7 @@ import { Build } from './screens/Build.jsx';
 import { clearRecipeCache } from './lib/data.js';
 import { Settings } from './screens/Settings.jsx';
 import { Household } from './screens/Household.jsx';
+import { loadMemberships, joinHousehold } from './lib/households.js';
 
 const INVITE_KEY = 'wfd-invite';
 const readInvite = () => { try { return localStorage.getItem(INVITE_KEY); } catch { return null; } };
@@ -29,6 +30,7 @@ export function App() {
   const route = useRoute();
   const [session, setSession] = useState(undefined);
   const [member, setMember] = useState(undefined); // undefined = loading, null = not in a household
+  const [memberships, setMemberships] = useState([]);
   const [toast, setToast] = useState(null);
 
   const say = useCallback((text, err = false) => {
@@ -52,13 +54,11 @@ export function App() {
   const userId = session?.user?.id;
   const loadMember = useCallback(async () => {
     if (!userId) { setMember(undefined); return; }
-    const { data, error } = await supabase
-      .from('household_members')
-      .select('household_id, role, display_name, households(id, name, settings)')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error) { say(friendly(error), true); return; }
-    setMember(data || null);
+    try {
+      const { list, open } = await loadMemberships(userId);
+      setMemberships(list);
+      setMember(open);
+    } catch (error) { say(friendly(error), true); }
   }, [userId, say]);
 
   useEffect(() => { loadMember(); }, [loadMember]);
@@ -71,11 +71,12 @@ export function App() {
   } else if (member === null) {
     screen = <Onboarding say={say} invite={readInvite()} onDone={() => { clearInvite(); loadMember(); go('week'); }} onDropInvite={() => { clearInvite(); loadMember(); }} />;
   } else {
-    const props = { member, household: member.households, reload: loadMember, say, userId };
+    const props = { member, household: member.households, reload: loadMember, say, userId, memberships };
     const canEdit = member.role !== 'shopping';
     const name = route.name === 'join' ? 'week' : route.name;
     if (route.name === 'join') { clearInvite(); }
-    if (name === 'settings') screen = <Settings {...props} />;
+    if (route.name === 'join' && route.param) screen = <JoinAnother token={route.param} member={member} say={say} />;
+    else if (name === 'settings') screen = <Settings {...props} />;
     else if (name === 'household') screen = <Household {...props} />;
     else if (name === 'shopping') screen = <Shopping {...props} />;
     else if (name === 'build' && canEdit) screen = <Build {...props} start={route.param} />;
@@ -104,5 +105,24 @@ export function App() {
       )}
       {toast && <div class={`toast${toast.err ? ' err' : ''}`} role="status">{toast.text}</div>}
     </div>
+  );
+}
+
+// Someone already in a household opened an invite link: join that one too (their own stays).
+function JoinAnother({ token, member, say }) {
+  const [busy, setBusy] = useState(false);
+  async function join() {
+    setBusy(true);
+    try { await joinHousehold(token, member.display_name); } catch (err) { say(friendly(err), true); setBusy(false); }
+  }
+  return (
+    <main class="main">
+      <div style="text-align:center;display:flex;flex-direction:column;gap:8px;margin-top:24px">
+        <h1 class="display">Join another household?</h1>
+        <p class="cap" style="margin:0">You've been invited to another household. You'll keep {member.households.name} and can switch between them in Settings.</p>
+      </div>
+      <button class="btn" disabled={busy} onClick={join}>{busy ? 'Joining…' : 'Join household'}</button>
+      <button class="btn outline" onClick={() => go('week')}>Not now</button>
+    </main>
   );
 }

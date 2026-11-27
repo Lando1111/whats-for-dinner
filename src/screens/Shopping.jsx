@@ -5,13 +5,15 @@ import { fetchItems, fetchSections, cachedItems, run, flush, pendingCount, updat
 import { SECTIONS, SECTION_LABEL, sectionFor, memoryFor, guessSection } from '../lib/sections.js';
 import { useSectionOrder, orderedSections } from '../lib/prefs.js';
 import { AisleOrder } from './AisleOrder.jsx';
+import { HouseholdSwitch, HouseholdChip } from './HouseholdSwitch.jsx';
 import { parseIngredient } from '../lib/parse.js';
 import { formatAmount } from '../lib/units.js';
 import { Icon } from '../icons.jsx';
 
 const UNDO_MS = 5000;
 
-export function Shopping({ household, say, userId }) {
+export function Shopping({ household, say, userId, memberships }) {
+  const [switching, setSwitching] = useState(false);
   const recipes = useRecipes() || [];
   const titleOf = useMemo(() => Object.fromEntries(recipes.map((r) => [r.id, r.title])), [recipes]);
   const [items, setItems] = useState(cachedItems);
@@ -122,6 +124,8 @@ export function Shopping({ household, say, userId }) {
           {offline ? <>Offline{pendingCount() ? ` · ${pendingCount()} to sync` : ''}</> : <><Icon name="check" size={14} stroke={2.6} />Synced</>}
         </span>
       </header>
+      <HouseholdChip memberships={memberships} household={household} onOpen={() => setSwitching(true)} />
+      {switching && <HouseholdSwitch memberships={memberships} current={household.id} userId={userId} onClose={() => setSwitching(false)} say={say} />}
       {offline && <p class="cap" style="margin:0;padding:8px 12px;border-radius:12px;background:var(--duck);color:var(--ink)">No reception. You can keep ticking; changes sync when you're back online.</p>}
 
       <div class="seg" role="tablist">

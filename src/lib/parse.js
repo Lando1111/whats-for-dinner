@@ -188,8 +188,22 @@ export function parseIngredient(raw) {
   return { quantity, unit, name: line, note: note || null, ok };
 }
 
+// "To serve", "Garnish", "Toppings"…: the lines after it are served with the dish.
+export const GARNISH_HEADING = /^(?:to (?:serve|garnish|top|finish)|(?:for (?:the )?)?(?:garnish(?:es)?|toppings?|to serve|serving)(?: (?:and|&) (?:garnish(?:es)?|toppings?|serving))?|serve with|optional (?:toppings?|garnish(?:es)?))\s*:?$/i;
+// Any other short heading ("For the sauce:") ends the garnish list and isn't an ingredient.
+const OTHER_HEADING = /^(?:for (?:the )?)?[A-Za-z][A-Za-z &'-]{1,30}:$/;
+
 export function parseIngredients(text) {
-  return text.split(/\r?\n/).map(parseIngredient).filter(Boolean);
+  const out = [];
+  let garnish = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const t = raw.replace(/^[\s•·*-]+/, '').trim();
+    if (GARNISH_HEADING.test(t)) { garnish = true; continue; }
+    if (OTHER_HEADING.test(t) && !/\d/.test(t) && t.split(' ').length <= 5) { garnish = false; continue; }
+    const line = parseIngredient(raw);
+    if (line) out.push(garnish ? { ...line, garnish: true } : line);
+  }
+  return out;
 }
 
 // Method: one step per line, or split numbered paragraphs.

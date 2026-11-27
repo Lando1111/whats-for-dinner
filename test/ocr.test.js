@@ -229,3 +229,11 @@ test('numbered method with wrapped lines indented under each number', () => {
     'NOTES: This soup will keep in the fridge for up to 3 days.'
   ]);
 });
+
+test('a "To serve" heading in a photo is kept for the garnish list', async () => {
+  const { joinIngredientLines } = await import('../src/lib/ocrtext.js');
+  const { parseIngredients } = await import('../src/lib/parse.js');
+  const lines = joinIngredientLines([['2 cups rice', 'TO SERVE', 'coriander leaves', 'lime wedges']]);
+  const r = parseIngredients(lines.join('\n'));
+  assert.deepEqual(r.map((l) => [l.name, !!l.garnish]), [['rice', false], ['coriander leaves', true], ['lime wedges', true]]);
+});

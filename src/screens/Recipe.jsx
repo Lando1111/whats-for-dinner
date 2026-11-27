@@ -36,6 +36,20 @@ export function Recipe({ id, household, canEdit, say, userId }) {
   }
 
   const photo = recipe.photo_path && urls[recipe.photo_path];
+  const main = recipe.ingredients.filter((l) => !l.garnish);
+  const garnish = recipe.ingredients.filter((l) => l.garnish);
+  const ingLine = (line) => {
+    const conv = convertLine(line, { system, prefs, multiplier: mult });
+    const amount = original ? formatOriginal(line, mult, system) : formatAmount(conv);
+    const orig = !original && conv.converted ? formatOriginal(line, mult, system) : '';
+    return (
+      <li>
+        <span class="amt">{amount}</span>
+        <span>{line.name}{line.note ? <span class="cap">, {line.note}</span> : null}{orig ? <span class="cap"> ({orig})</span> : null}</span>
+      </li>
+    );
+  };
+
   return (
     <main class="main no-tabs" style="padding-top:0;padding-left:0;padding-right:0;gap:0">
       <div style={`position:relative;height:${photo ? 240 : 120}px;background:var(--duck);flex:none`}>
@@ -73,19 +87,15 @@ export function Recipe({ id, household, canEdit, say, userId }) {
         </div>
         {system !== 'AU' && !original && <span class="cap" style="margin-top:-8px">Converted from {SYSTEM_TEXT[system]} to your units.</span>}
         <ul class="ing">
-          {recipe.ingredients.map((line) => {
-            const conv = convertLine(line, { system, prefs, multiplier: mult });
-            const amount = original ? formatOriginal(line, mult, system) : formatAmount(conv);
-            const orig = !original && conv.converted ? formatOriginal(line, mult, system) : '';
-            return (
-              <li>
-                <span class="amt">{amount}</span>
-                <span>{line.name}{line.note ? <span class="cap">, {line.note}</span> : null}{orig ? <span class="cap"> ({orig})</span> : null}</span>
-              </li>
-            );
-          })}
+          {main.map(ingLine)}
           {recipe.ingredients.length === 0 && <li class="cap">No ingredients yet.</li>}
         </ul>
+        {garnish.length > 0 && (
+          <>
+            <h3 style="margin:4px 0 -8px;font-size:16px;line-height:22px">Garnish &amp; toppings</h3>
+            <ul class="ing">{garnish.map(ingLine)}</ul>
+          </>
+        )}
         {recipe.ingredients.length > 0 && (
           <button class="btn outline block" style="height:48px;font-size:15px" onClick={() => setShopping(true)}><Icon name="cart" size={20} />Add ingredients to shopping list{doubled ? ' (×2)' : ''}</button>
         )}

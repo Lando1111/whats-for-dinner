@@ -12,7 +12,7 @@ const emit = () => subs.forEach((fn) => fn(recipes));
 export async function refreshRecipes() {
   loading = supabase
     .from('recipes')
-    .select('*, ingredients(id, position, quantity, unit, name, note)')
+    .select('*, ingredients(id, position, quantity, unit, name, note, garnish)')
     .order('title')
     .then(({ data, error }) => {
       loading = null;
@@ -63,7 +63,8 @@ export async function saveRecipe(recipe, lines, householdId) {
     if (error) throw error;
     id = data.id;
   }
-  const ing = lines
+  // Main ingredients first, then the garnish & toppings.
+  const ing = [...lines.filter((l) => !l.garnish), ...lines.filter((l) => l.garnish)]
     .filter((l) => (l.name || '').trim())
     .map((l, i) => ({
       recipe_id: id,
@@ -72,7 +73,8 @@ export async function saveRecipe(recipe, lines, householdId) {
       quantity: typeof l.quantity === 'number' ? l.quantity : parseNumber(String(l.quantity ?? '')),
       unit: (l.unit || '').trim() || null,
       name: l.name.trim(),
-      note: (l.note || '').trim() || null
+      note: (l.note || '').trim() || null,
+      garnish: !!l.garnish
     }));
   if (ing.length) {
     const { error } = await supabase.from('ingredients').insert(ing);

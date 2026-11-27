@@ -122,3 +122,9 @@ test('a real RecipeTin Eats ingredient list comes through clean', async () => {
     [2, 'sheet', 'puff pastry', 'enough to cover pots, with drape', true]
   ]);
 });
+
+test('garnish & toppings headings', async () => {
+  const { parseIngredients } = await import('../src/lib/parse.js');
+  const r = parseIngredients(['500 g beef mince', 'For the salsa:', '2 tomatoes, diced', 'To serve:', '8 taco shells', '- sour cream', 'Toppings', 'lime wedges', 'For the sauce:', '1 cup passata'].join('\n'));
+  assert.deepEqual(r.map((l) => [l.name, !!l.garnish]), [['beef mince', false], ['tomatoes', false], ['taco shells', true], ['sour cream', true], ['lime wedges', true], ['passata', false]]);
+});

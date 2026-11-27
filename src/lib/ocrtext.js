@@ -2,6 +2,7 @@
 // Plain rules for the mistakes text recognition makes on cookbook pages. No AI.
 import { normaliseUnit } from './units.js';
 import { fixSpelling } from './spellfix.js';
+import { GARNISH_HEADING } from './parse.js';
 
 // Words that follow an amount at the start of an ingredient line, besides units.
 const COUNT_WORDS = new Set(['large', 'medium', 'small', 'whole', 'piece', 'pieces', 'bunch', 'bunches', 'handful', 'handfuls',
@@ -116,6 +117,7 @@ export function joinIngredientLines(boxes) {
       const bulleted = BULLET.test(raw) && !/^[-–]\s*\d/.test(raw);
       const text = raw.replace(BULLET, '').trim();
       if (SERVES_LINE.test(text)) { prev = null; continue; }
+      if (GARNISH_HEADING.test(text)) { skipping = false; prev = null; out.push({ text, heading: true }); continue; }
       if (HEADING.test(text) || (!capsBook && isCapsHeading(text) && text.split(' ').length <= 4)) {
         skipping = SKIP_AFTER.test(text);
         prev = null;
@@ -135,7 +137,7 @@ export function joinIngredientLines(boxes) {
       else { prev = { text }; out.push(prev); }
     }
   }
-  return out.map((l) => fixSpelling(cleanIngredientLine(l.text))).filter((t) => t && lettersIn(t) >= 2);
+  return out.map((l) => (l.heading ? l.text : fixSpelling(cleanIngredientLine(l.text)))).filter((t) => t && lettersIn(t) >= 2);
 }
 
 /**

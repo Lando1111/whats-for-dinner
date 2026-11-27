@@ -155,6 +155,27 @@ function Form({ existing, household, say }) {
   const setLine = (i, k, v) => setLines(lines.map((l, j) => (j === i ? { ...l, [k]: v, ok: true } : l)));
   const [qtyFocus, setQtyFocus] = useState(null); // which amount box is being typed in
 
+  // One ingredient line (main list or garnish & toppings).
+  const row = (l, i) => (
+    <div class={`ing-row${l.ok === false ? ' flag' : ''}`}>
+      <input class="field sm" aria-label="Amount" inputmode="decimal" value={l.quantity} onInput={(e) => setLine(i, 'quantity', e.currentTarget.value)} placeholder={l.name ? '' : '1½'}
+        onFocus={() => setQtyFocus(i)}
+        onBlur={(e) => { setQtyFocus((f) => (f === i ? null : f)); const v = e.currentTarget.value.trim(); if (v && parseNumber(v) == null) setLines((ls) => ls.map((x, j) => (j === i ? { ...x, ok: false } : x))); }} />
+      <input class="field sm" aria-label="Unit" value={l.unit} onInput={(e) => setLine(i, 'unit', e.currentTarget.value)} placeholder={l.name ? '' : 'cup'} />
+      <input class="field sm" aria-label="Ingredient" value={l.note ? `${l.name}, ${l.note}` : l.name}
+        onInput={(e) => { const v = e.currentTarget.value; const c = v.indexOf(','); setLines(lines.map((x, j) => (j === i ? { ...x, name: c > 0 ? v.slice(0, c).trim() : v, note: c > 0 ? v.slice(c + 1).trim() : '', ok: true } : x))); }}
+        placeholder={l.garnish ? 'lime wedges' : 'plain flour, sifted'} />
+      <button type="button" class="icon-btn" aria-label="Remove line" onClick={() => { const rest = lines.filter((_, j) => j !== i); setLines(rest.some((x) => !x.garnish) ? rest : [blankLine(), ...rest]); }}><Icon name="close" size={18} /></button>
+      {qtyFocus === i && (
+        <div class="frac-keys" role="group" aria-label="Fractions">
+          {FRACTION_KEYS.map((k) => (
+            <button type="button" aria-label={k === '/' ? 'Slash' : k} onPointerDown={(e) => e.preventDefault()} onClick={() => typeFraction(i, k)}>{k}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   // A fraction key: put it where the cursor is and keep the keyboard open.
   function typeFraction(i, key) {
     const el = document.activeElement;
@@ -279,27 +300,15 @@ function Form({ existing, household, say }) {
           )}
           <div style="display:flex;flex-direction:column;gap:6px">
             <div class="ing-row cap" aria-hidden="true"><span>Amount</span><span>Unit</span><span>Ingredient, note</span><span /></div>
-            {lines.map((l, i) => (
-              <div class={`ing-row${l.ok === false ? ' flag' : ''}`}>
-                <input class="field sm" aria-label="Amount" inputmode="decimal" value={l.quantity} onInput={(e) => setLine(i, 'quantity', e.currentTarget.value)} placeholder={l.name ? '' : '1½'}
-                  onFocus={() => setQtyFocus(i)}
-                  onBlur={(e) => { setQtyFocus((f) => (f === i ? null : f)); const v = e.currentTarget.value.trim(); if (v && parseNumber(v) == null) setLines((ls) => ls.map((x, j) => (j === i ? { ...x, ok: false } : x))); }} />
-                <input class="field sm" aria-label="Unit" value={l.unit} onInput={(e) => setLine(i, 'unit', e.currentTarget.value)} placeholder={l.name ? '' : 'cup'} />
-                <input class="field sm" aria-label="Ingredient" value={l.note ? `${l.name}, ${l.note}` : l.name}
-                  onInput={(e) => { const v = e.currentTarget.value; const c = v.indexOf(','); setLines(lines.map((x, j) => (j === i ? { ...x, name: c > 0 ? v.slice(0, c).trim() : v, note: c > 0 ? v.slice(c + 1).trim() : '', ok: true } : x))); }}
-                  placeholder="plain flour, sifted" />
-                <button type="button" class="icon-btn" aria-label="Remove line" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [blankLine()])}><Icon name="close" size={18} /></button>
-                {qtyFocus === i && (
-                  <div class="frac-keys" role="group" aria-label="Fractions">
-                    {FRACTION_KEYS.map((k) => (
-                      <button type="button" aria-label={k === '/' ? 'Slash' : k} onPointerDown={(e) => e.preventDefault()} onClick={() => typeFraction(i, k)}>{k}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+            {lines.map((l, i) => [l, i]).filter(([l]) => !l.garnish).map(([l, i]) => row(l, i))}
             {lines.some((l) => l.ok === false) && <span class="cap" style="color:var(--beet);font-weight:600">Highlighted lines didn't read cleanly. Check the amount and unit.</span>}
             <button type="button" class="link" style="align-self:flex-start;padding:0" onClick={() => setLines([...lines, blankLine()])}>+ Add an ingredient</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:16px">
+            <h3 class="lbl" style="margin:0">Garnish &amp; toppings</h3>
+            {!lines.some((l) => l.garnish) && <span class="cap">Served with it, like taco toppings, fresh herbs or lime wedges. They still go on the shopping list.</span>}
+            {lines.map((l, i) => [l, i]).filter(([l]) => l.garnish).map(([l, i]) => row(l, i))}
+            <button type="button" class="link" style="align-self:flex-start;padding:0" onClick={() => setLines([...lines, { ...blankLine(), garnish: true }])}>+ Add a garnish or topping</button>
           </div>
         </section>
 

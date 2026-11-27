@@ -9,8 +9,10 @@ import { HouseholdSwitch, HouseholdChip } from './HouseholdSwitch.jsx';
 import { parseIngredient } from '../lib/parse.js';
 import { formatAmount } from '../lib/units.js';
 import { Icon } from '../icons.jsx';
+import { confetti, buzz, motionOn } from '../lib/motion.js';
 
 const UNDO_MS = 5000;
+const LEAVE_MS = 280; // ticked rows slide away before they move to Bought
 
 export function Shopping({ household, say, userId, memberships }) {
   const [switching, setSwitching] = useState(false);
@@ -25,6 +27,8 @@ export function Shopping({ household, say, userId, memberships }) {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [text, setText] = useState('');
   const [pending, setPending] = useState({}); // id → true while the undo timer runs
+  const [leaving, setLeaving] = useState({}); // id → true while the row slides away
+  const [cheer, setCheer] = useState(false); // this person just ticked off the last item
   const [snack, setSnack] = useState(null);
   const [edit, setEdit] = useState(null);
   const [note, setNote] = useState('');
@@ -60,12 +64,20 @@ export function Shopping({ household, say, userId, memberships }) {
     if (pending[item.id]) return undo(item);
     setPending((p) => ({ ...p, [item.id]: true }));
     setSnack({ item, at: Date.now() });
+    const last = toBuy.length > 0 && toBuy.every((i) => i.id === item.id || pending[i.id]);
+    if (last) { setCheer(true); confetti(); buzz([20, 60, 40]); } else buzz(10);
     timers.current[item.id] = setTimeout(() => {
-      delete timers.current[item.id];
-      setPending((p) => { const n = { ...p }; delete n[item.id]; return n; });
-      setSnack((s) => (s?.item.id === item.id ? null : s));
-      const at = new Date().toISOString();
-      act({ type: 'update', id: item.id, fields: { archived_at: at } }, (cur) => cur.map((x) => (x.id === item.id ? { ...x, archived_at: at } : x)));
+      const archive = () => {
+        delete timers.current[item.id];
+        setPending((p) => { const n = { ...p }; delete n[item.id]; return n; });
+        setLeaving((p) => { const n = { ...p }; delete n[item.id]; return n; });
+        setSnack((s) => (s?.item.id === item.id ? null : s));
+        const at = new Date().toISOString();
+        act({ type: 'update', id: item.id, fields: { archived_at: at } }, (cur) => cur.map((x) => (x.id === item.id ? { ...x, archived_at: at } : x)));
+      };
+      if (!motionOn()) return archive();
+      setLeaving((p) => ({ ...p, [item.id]: true }));
+      timers.current[item.id] = setTimeout(archive, LEAVE_MS);
     }, UNDO_MS);
   }
 
@@ -73,7 +85,9 @@ export function Shopping({ household, say, userId, memberships }) {
     clearTimeout(timers.current[item.id]);
     delete timers.current[item.id];
     setPending((p) => { const n = { ...p }; delete n[item.id]; return n; });
+    setLeaving((p) => { const n = { ...p }; delete n[item.id]; return n; });
     setSnack((s) => (s?.item.id === item.id ? null : s));
+    setCheer(false);
   }
 
   function add(e) {
@@ -84,6 +98,7 @@ export function Shopping({ household, say, userId, memberships }) {
     const mem = memoryFor(name, sections);
     const row = { id: crypto.randomUUID(), household_id: household.id, name, quantity: p.quantity, unit: p.unit, category: sectionFor(name, sections), organic: !!mem?.organic, buy_note: mem?.buy_note || null, recipe_ids: [], created_by: userId, created_at: new Date().toISOString(), archived_at: null };
     setText('');
+    setCheer(false);
     act({ type: 'add', row }, (cur) => [...cur, row]);
   }
 
@@ -141,17 +156,25 @@ export function Shopping({ household, say, userId, memberships }) {
             <button class="icon-btn" aria-label="Add item" style="width:48px;height:48px;background:var(--raised);box-shadow:var(--sh)" disabled={!text.trim()}><Icon name="plus" /></button>
           </form>
           {toBuy.length === 0 ? (
-            <div class="empty">
-              <img src={`${import.meta.env.BASE_URL}icons/pizza-mark.svg`} alt="" />
-              <p style="margin:0;font-weight:700">Nothing to buy</p>
-              <p class="cap" style="margin:0;max-width:280px">Add things above, or use <strong>Build list</strong> on the Week screen to add what this week's meals need.</p>
-            </div>
+            cheer ? (
+              <div class="empty">
+                <img class="bounce" src={`${import.meta.env.BASE_URL}icons/pizza-mark.svg`} alt="" />
+                <p style="margin:0;font:600 22px/28px var(--display)">All bought!</p>
+                <p class="cap" style="margin:0;max-width:280px">Everything's ticked off. Find it under <strong>Bought</strong> if you need to put something back.</p>
+              </div>
+            ) : (
+              <div class="empty">
+                <img src={`${import.meta.env.BASE_URL}icons/pizza-mark.svg`} alt="" />
+                <p style="margin:0;font-weight:700">Nothing to buy</p>
+                <p class="cap" style="margin:0;max-width:280px">Add things above, or use <strong>Build list</strong> on the Week screen to add what this week's meals need.</p>
+              </div>
+            )
           ) : [<div class="row-head" style="gap:8px;flex-wrap:wrap"><p class="cap" style="margin:0;flex:1;min-width:180px">In the wrong part of the shop? Tap the item to move it.</p><button class="link" style="min-height:44px" onClick={() => setAisles(true)}>Aisle order</button></div>, ...groups.map((g) => (
             <section>
               <h2 class="lbl">{g.label}</h2>
               <ul class="card shop">
                 {g.items.map((i) => (
-                  <li class={pending[i.id] ? 'done' : ''}>
+                  <li class={`${pending[i.id] ? 'done' : ''}${leaving[i.id] ? ' leaving' : ''}`}>
                     <button class="tickbox" role="checkbox" aria-checked={pending[i.id] ? 'true' : 'false'} aria-label={i.name} onClick={() => tick(i)}>{pending[i.id] && <Icon name="check" size={18} stroke={3} />}</button>
                     <button class="shop-text" onClick={() => { setEdit(i); setNote(i.buy_note || ''); }} aria-label={`${i.name}${i.organic ? ', organic' : ''}. Change section or preferences`}>
                       <span class="nm">{i.name}{i.organic && <span class="chip organic"><Icon name="leaf" size={12} stroke={2.4} />Organic</span>}</span>
@@ -183,7 +206,7 @@ export function Shopping({ household, say, userId, memberships }) {
       {snack && (
         <div class="toast" role="status" style="display:flex;align-items:center;gap:10px;padding:6px 8px 6px 16px">
           <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="10" fill="none" stroke="var(--line)" stroke-width="3" /><circle class="ring" key={snack.at} cx="13" cy="13" r="10" fill="none" stroke="var(--beet)" stroke-width="3" stroke-dasharray="62.8" transform="rotate(-90 13 13)" stroke-linecap="round" /></svg>
-          <span style="flex:1">{snack.item.name} bought</span>
+          <span style="flex:1">{cheer ? <strong>All done! </strong> : null}{snack.item.name} bought</span>
           <button class="link" onClick={() => undo(snack.item)}>Undo</button>
         </div>
       )}

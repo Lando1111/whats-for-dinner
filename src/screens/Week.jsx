@@ -5,6 +5,7 @@ import { loadPlan, planRecipe, clearNight, updateNight, upsertNight, setLeftover
 import { Recipes } from './Recipes.jsx';
 import { Icon } from '../icons.jsx';
 import { HouseholdSwitch, HouseholdChip } from './HouseholdSwitch.jsx';
+import { confetti, buzz, motionOn } from '../lib/motion.js';
 
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -30,6 +31,7 @@ export function Week({ household, member, say, memberships, userId }) {
   const [busy, setBusy] = useState(false);
   const [extras, setExtras] = useState([]);
   const [pickingExtra, setPickingExtra] = useState(false);
+  const [fresh, setFresh] = useState({}); // date → order, for nights Fill the week just planned
 
   const start = weekStart(offset);
   const dates = weekDatesFrom(start);
@@ -62,13 +64,21 @@ export function Week({ household, member, say, memberships, userId }) {
   const urls = usePhotoUrls([...plan, ...extras].map((p) => rById[p.recipe_id]?.photo_path));
   const extraRun = async (fn) => { try { await fn(); await load(); } catch (e) { say(friendly(e), true); } };
 
-  async function fill() {
+  async function fill(e) {
     if (!recipes?.length) return say('Add some recipes first.', true);
+    const box = e.currentTarget.getBoundingClientRect();
     setBusy(true);
     try {
       const picks = planFill({ recipes, weekDates: dates.filter((d) => d >= todayIso), plan, recent, settings: household.settings });
       for (const { date, recipe } of picks) await planRecipe(household.id, date, recipe);
       await load();
+      if (picks.length) {
+        setFresh(Object.fromEntries(picks.map((p, i) => [p.date, i])));
+        setTimeout(() => setFresh({}), 1600);
+        buzz(15);
+        // Whole week planned: a small burst from the tile.
+        if (picks.length >= emptyFuture) confetti({ x: box.left + box.width / 2, y: box.top + box.height / 2, count: 70, spread: 100, duration: 2000 });
+      }
       say(picks.length ? `Filled ${picks.length} ${picks.length === 1 ? 'night' : 'nights'}. Tap any night to change it.` : 'No empty nights left to fill.');
     } catch (e) { say(friendly(e), true); }
     setBusy(false);
@@ -109,7 +119,8 @@ export function Week({ household, member, say, memberships, userId }) {
           const sub = !p ? (canEdit && !past ? 'Tap to choose' : '') : p.kind === 'out' ? p.note || '' : p.kind === 'leftovers' ? (src ? `From ${LONG[fromIso(src.date).getDay()]}` : '') : [p.locked && 'Locked', p.makes_leftovers && 'Makes leftovers'].filter(Boolean).join(' · ');
           const photo = r?.photo_path && urls[r.photo_path];
           return (
-            <button class={`tile ${kind === 'empty' ? '' : kind}${isToday ? ' today' : ''}${past ? ' past' : ''}`}
+            <button class={`tile ${kind === 'empty' ? '' : kind}${isToday ? ' today' : ''}${past ? ' past' : ''}${fresh[iso] != null ? ' pop' : ''}`}
+              style={fresh[iso] != null ? `animation-delay:${fresh[iso] * 70}ms` : ''}
               aria-label={`${LONG[fromIso(iso).getDay()]} ${fromIso(iso).getDate()}: ${title}`}
               onClick={() => (canEdit ? setOpen(iso) : r && (location.hash = `#/recipe/${r.id}`))}>
               <div class="pic">
@@ -125,7 +136,7 @@ export function Week({ household, member, say, memberships, userId }) {
           );
         })}
         <button class="tile fill" disabled={!canEdit || busy || !emptyFuture} onClick={fill}>
-          <Icon name="dice" size={40} stroke={1.8} />
+          <span class={busy ? 'roll' : ''} style="display:inline-flex;align-self:flex-start"><Icon name="dice" size={40} stroke={1.8} /></span>
           <span style="font:600 22px/26px var(--display)">{busy ? 'Filling…' : 'Fill the week'}</span>
           <span style="font-size:13px;line-height:17px">{!canEdit ? 'Ask someone with full access' : emptyFuture ? 'Fills empty nights, keeps locked ones' : 'Every night is planned'}</span>
         </button>
@@ -182,6 +193,8 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
   const rById = Object.fromEntries(recipes.map((r) => [r.id, r]));
   const recipe = row && rById[row.recipe_id];
   const [picking, setPicking] = useState(false);
+  const [rolling, setRolling] = useState(false);
+  const [surprised, setSurprised] = useState(false);
   const [note, setNote] = useState(row?.note || '');
   const urls = usePhotoUrls([recipe?.photo_path]);
   const d = fromIso(date);
@@ -198,7 +211,9 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
     const needLeftovers = (household.settings?.leftover_weekdays || []).includes(d.getDay());
     const r = pickRecipe(recipes, { date, avoid, needLeftovers, weekendDays: household.settings?.weekend_weekdays });
     if (!r) return say('Add some recipes first.', true);
-    choose(r);
+    if (!motionOn()) return choose(r);
+    setRolling(true);
+    setTimeout(async () => { await choose(r); setRolling(false); setSurprised(true); buzz(12); }, 450);
   }
 
   async function setOut(on) {
@@ -243,7 +258,7 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
           </div>
 
           {row?.kind === 'cook' && recipe && (
-            <a href={`#/recipe/${recipe.id}`} class="listrow" style="min-height:72px;background:var(--surface);border-radius:16px;padding:8px;border:0">
+            <a key={recipe.id} href={`#/recipe/${recipe.id}`} class={`listrow${surprised ? ' pop' : ''}`} style="min-height:72px;background:var(--surface);border-radius:16px;padding:8px;border:0">
               {urls[recipe.photo_path] ? <img class="thumb" style="width:72px;height:56px" src={urls[recipe.photo_path]} alt="" /> : <span class="thumb" style="width:72px;height:56px;background:var(--duck);display:flex;align-items:center;justify-content:center"><Icon name="bowl" /></span>}
               <span style="display:flex;flex-direction:column"><span style="font-weight:700">{recipe.title}</span><span class="cap">Tap to open the recipe</span></span>
               <span style="margin-left:auto"><Icon name="next" size={20} /></span>
@@ -256,7 +271,7 @@ function NightSheet({ date, plan, recipes, household, say, recent, onChange, onC
           {row?.kind !== 'out' && (
             <div class="grid2" style="gap:8px">
               <button class="btn outline" style="height:48px;font-size:15px" onClick={() => setPicking(true)}><Icon name="search" size={20} />Pick a recipe</button>
-              <button class="btn outline" style="height:48px;font-size:15px" onClick={surprise}><Icon name="dice" size={20} stroke={1.8} />Surprise me</button>
+              <button class="btn outline" style="height:48px;font-size:15px" onClick={surprise} disabled={rolling}><span class={rolling ? 'roll' : ''} style="display:inline-flex"><Icon name="dice" size={20} stroke={1.8} /></span>Surprise me</button>
             </div>
           )}
 

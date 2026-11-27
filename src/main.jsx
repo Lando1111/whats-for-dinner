@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { App } from './app.jsx';
 import { applyTheme, getTheme } from './lib/theme.js';
+import { applyMotion } from './lib/motion.js';
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
 
@@ -17,6 +18,7 @@ registerSW({
 });
 
 applyTheme(getTheme());
+applyMotion();
 
 // Opened from Android's Share menu: ?url=…&text=… → import that link as a new recipe.
 const q = new URLSearchParams(location.search);

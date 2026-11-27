@@ -189,3 +189,28 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 
 /* Open household, shown for people in more than one */
 .house-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid var(--duck); background: var(--raised); color: var(--ink); font: 700 15px/1 var(--body); }
+
+/* Motion: small, quick and skipped when this person or their phone turns animations off */
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes rise { from { transform: translateY(40px); opacity: .4; } }
+@keyframes rise-sm { from { transform: translateY(12px); opacity: 0; } }
+@keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes pop-in { 0% { transform: scale(.85); opacity: 0; } 70% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes draw { from { stroke-dashoffset: 22; } }
+@keyframes leave { from { max-height: 80px; } to { max-height: 0; min-height: 0; opacity: 0; transform: translateX(32px); border-bottom-width: 0; } }
+@keyframes roll { 0% { transform: rotate(0); } 50% { transform: rotate(200deg) scale(1.1); } 100% { transform: rotate(360deg); } }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-14px) rotate(-6deg); } 55% { transform: translateY(0); } 70% { transform: translateY(-5px) rotate(3deg); } }
+.scrim { animation: fade-in .18s ease-out; }
+.scrim > .sheet { animation: rise .26s cubic-bezier(.2, .9, .3, 1.1); }
+.toast { animation: rise-sm .2s ease-out; }
+.shop li.done .tickbox { animation: pop .28s ease-out; }
+.shop li.done .tickbox svg path { stroke-dasharray: 22; animation: draw .25s ease-out .05s backwards; }
+.shop li.done .nm, .shop li.done .qty { transition: color .2s; }
+.shop li.leaving { animation: leave .28s ease-in forwards; overflow: hidden; }
+.pop { animation: pop-in .38s cubic-bezier(.2, .9, .3, 1.2) backwards; }
+.roll { animation: roll .5s ease-in-out infinite; }
+.bounce { animation: bounce 1.1s ease-out .2s; }
+.tabs a span { transition: background-color .2s; }
+.tabs a[aria-current='page'] span svg { animation: pop .3s ease-out; }
+:root[data-motion='off'] *:not(.ring), :root[data-motion='off'] *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { *:not(.ring) { animation: none !important; transition: none !important; } }

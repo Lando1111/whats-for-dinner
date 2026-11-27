@@ -2,6 +2,7 @@ import { DEFAULT_WEEKEND } from '../lib/data.js';
 import { useState } from 'preact/hooks';
 import { supabase, friendly } from '../lib/supabase.js';
 import { getTheme, setTheme } from '../lib/theme.js';
+import { getMotion, setMotion } from '../lib/motion.js';
 import { HouseholdSwitch } from './HouseholdSwitch.jsx';
 import { Icon } from '../icons.jsx';
 
@@ -30,6 +31,7 @@ function Stepper({ label, value, min, max, unit, onChange, disabled }) {
 export function Settings({ member, household, reload, say, memberships, userId }) {
   const [switching, setSwitching] = useState(false);
   const [theme, setThemeState] = useState(getTheme());
+  const [motion, setMotionState] = useState(getMotion());
   const isOwner = member.role === 'owner';
   const s = household.settings || {};
   const units = s.unit_prefs || { dry: 'g', liquid: 'ml', butter: 'g' };
@@ -113,6 +115,10 @@ export function Settings({ member, household, reload, say, memberships, userId }
         <h2 class="lbl">Appearance</h2>
         <div class="card">
           <div class="row"><span>Theme</span><Seg label="Theme" options={[['light', 'Light'], ['dark', 'Dark'], ['phone', 'Phone']]} value={theme} onChange={(v) => { setTheme(v); setThemeState(v); }} /></div>
+          <div class="srow" style="border-bottom:0">
+            <span style="display:flex;flex-direction:column"><span>Animations</span><span class="cap">Confetti and little movements on this phone. Off if your phone is set to remove animations.</span></span>
+            <button class="switch" role="switch" aria-checked={motion ? 'true' : 'false'} aria-label="Animations" onClick={() => { setMotion(!motion); setMotionState(!motion); }} />
+          </div>
         </div>
       </section>
 

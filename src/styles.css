@@ -254,3 +254,8 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 @keyframes magic { 30% { transform: translate(40px, -18px) rotate(4deg); } 60% { transform: translate(-30px, 10px) rotate(-3deg); } }
 @keyframes magic2 { 30% { transform: translate(-46px, 14px) rotate(-5deg); } 60% { transform: translate(24px, -8px) rotate(3deg); } }
 @keyframes magic3 { 30% { transform: translate(20px, 22px) rotate(6deg); } 60% { transform: translate(-16px, -14px); } }
+
+/* Fraction keys under the amount box (Android's number pad has no '/') */
+.frac-keys { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; animation: rise-sm .15s ease-out; }
+.frac-keys button { min-width: 48px; min-height: 44px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 20px/1 var(--display); }
+.frac-keys button:active { background: var(--apricot); }

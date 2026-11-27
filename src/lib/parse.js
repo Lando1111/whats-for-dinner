@@ -8,7 +8,7 @@ const NUM = String.raw`(?:\d+(?:[.,]\d+)?\s*[¼½¾⅓⅔⅛⅜⅝⅞]|\d+\s+\d+
 
 export function parseNumber(s) {
   if (!s) return null;
-  s = s.trim().replace(',', '.');
+  s = s.trim().replace(',', '.').replace(/\s*\/\s*/g, '/');
   let m = s.match(/^(\d+(?:\.\d+)?)\s*([¼½¾⅓⅔⅛⅜⅝⅞])$/);
   if (m) return Number(m[1]) + UNICODE_FRACTIONS[m[2]];
   if (UNICODE_FRACTIONS[s] != null) return UNICODE_FRACTIONS[s];

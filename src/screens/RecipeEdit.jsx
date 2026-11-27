@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { useRecipes, saveRecipe, deleteRecipe, setRecipePhoto, SEASON_LIST, PROTEINS, MEAL_TYPES, OCCASIONS, EXTRAS_NAME } from '../lib/data.js';
-import { parseIngredients, parseMethod, splitRecipeText, guessProtein } from '../lib/parse.js';
+import { parseIngredients, parseMethod, splitRecipeText, guessProtein, parseNumber } from '../lib/parse.js';
 import { formatQty } from '../lib/units.js';
 import { supabase, friendly } from '../lib/supabase.js';
 import { go, back } from '../lib/router.js';
@@ -8,6 +8,8 @@ import { Icon } from '../icons.jsx';
 import { PhotoImport } from './PhotoImport.jsx';
 import { PickPhoto } from '../PickPhoto.jsx';
 
+// Android's number pad has no '/', so the amount box gets its own fraction keys while it's in use.
+const FRACTION_KEYS = ['¼', '⅓', '½', '⅔', '¾', '/'];
 const blankLine = () => ({ quantity: '', unit: '', name: '', note: '', ok: true });
 const qtyText = (q) => (q == null || q === '' ? '' : typeof q === 'number' ? formatQty(q) : q);
 
@@ -148,6 +150,17 @@ function Form({ existing, household, say }) {
 
   const set = (k, v) => setR({ ...r, [k]: v });
   const setLine = (i, k, v) => setLines(lines.map((l, j) => (j === i ? { ...l, [k]: v, ok: true } : l)));
+  const [qtyFocus, setQtyFocus] = useState(null); // which amount box is being typed in
+
+  // A fraction key: put it where the cursor is and keep the keyboard open.
+  function typeFraction(i, key) {
+    const el = document.activeElement;
+    const v = String(lines[i].quantity ?? '');
+    const at = el?.selectionStart ?? v.length, end = el?.selectionEnd ?? v.length;
+    const next = v.slice(0, at) + key + v.slice(end);
+    setLine(i, 'quantity', next);
+    requestAnimationFrame(() => { try { el?.setSelectionRange(at + key.length, at + key.length); } catch { /* not a text box */ } });
+  }
 
   function toggleSeason(s) {
     if (s === 'all') return set('seasons', ['all']);
@@ -265,12 +278,21 @@ function Form({ existing, household, say }) {
             <div class="ing-row cap" aria-hidden="true"><span>Amount</span><span>Unit</span><span>Ingredient, note</span><span /></div>
             {lines.map((l, i) => (
               <div class={`ing-row${l.ok === false ? ' flag' : ''}`}>
-                <input class="field sm" aria-label="Amount" inputmode="decimal" value={l.quantity} onInput={(e) => setLine(i, 'quantity', e.currentTarget.value)} placeholder={l.name ? '' : '1½'} />
+                <input class="field sm" aria-label="Amount" inputmode="decimal" value={l.quantity} onInput={(e) => setLine(i, 'quantity', e.currentTarget.value)} placeholder={l.name ? '' : '1½'}
+                  onFocus={() => setQtyFocus(i)}
+                  onBlur={(e) => { setQtyFocus((f) => (f === i ? null : f)); const v = e.currentTarget.value.trim(); if (v && parseNumber(v) == null) setLines((ls) => ls.map((x, j) => (j === i ? { ...x, ok: false } : x))); }} />
                 <input class="field sm" aria-label="Unit" value={l.unit} onInput={(e) => setLine(i, 'unit', e.currentTarget.value)} placeholder={l.name ? '' : 'cup'} />
                 <input class="field sm" aria-label="Ingredient" value={l.note ? `${l.name}, ${l.note}` : l.name}
                   onInput={(e) => { const v = e.currentTarget.value; const c = v.indexOf(','); setLines(lines.map((x, j) => (j === i ? { ...x, name: c > 0 ? v.slice(0, c).trim() : v, note: c > 0 ? v.slice(c + 1).trim() : '', ok: true } : x))); }}
                   placeholder="plain flour, sifted" />
                 <button type="button" class="icon-btn" aria-label="Remove line" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [blankLine()])}><Icon name="close" size={18} /></button>
+                {qtyFocus === i && (
+                  <div class="frac-keys" role="group" aria-label="Fractions">
+                    {FRACTION_KEYS.map((k) => (
+                      <button type="button" aria-label={k === '/' ? 'Slash' : k} onPointerDown={(e) => e.preventDefault()} onClick={() => typeFraction(i, k)}>{k}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {lines.some((l) => l.ok === false) && <span class="cap" style="color:var(--beet);font-weight:600">Highlighted lines didn't read cleanly. Check the amount and unit.</span>}

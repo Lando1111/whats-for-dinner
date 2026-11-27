@@ -9,6 +9,9 @@ const conv = (line, o) => formatAmount(convertLine(line, o));
 test('numbers', () => {
   assert.equal(parseNumber('1 1/2'), 1.5);
   assert.equal(parseNumber('1½'), 1.5);
+  assert.equal(parseNumber('1 / 2'), 0.5);
+  assert.equal(parseNumber('1 1 / 3'), 1 + 1 / 3);
+  assert.equal(parseNumber('2/'), null);
   assert.equal(parseNumber('½'), 0.5);
   assert.equal(parseNumber('2,5'), 2.5);
   assert.equal(formatQty(1.5), '1½');

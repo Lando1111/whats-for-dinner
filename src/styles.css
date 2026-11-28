@@ -266,3 +266,10 @@ h1.title { margin: 0; font: 600 24px/30px var(--display); }
 .pages .chipbtn { flex: none; gap: 6px; height: 44px; display: inline-flex; align-items: center; }
 .pages .count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; padding: 0 5px; }
 .pages .chipbtn.add { border-style: dashed; gap: 4px; }
+
+/* Dragging shopping items */
+.shop .grip { width: 40px; height: 52px; margin-right: -8px; flex: none; }
+.shop li.lifted { opacity: .35; }
+.shop li.drop-mark { min-height: 0; height: 4px; margin: -2px 0; border: 0; border-radius: 2px; background: var(--apricot); }
+.drag-ghost { position: fixed; left: 16px; right: 16px; max-width: 528px; margin: 0 auto; height: 60px; z-index: 30; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-radius: 16px; background: var(--raised); box-shadow: var(--sh), 0 12px 28px rgba(58, 46, 38, .25); pointer-events: none; transform: rotate(-1deg); }
+.drag-ghost .nm { flex: 1; font-weight: 700; }

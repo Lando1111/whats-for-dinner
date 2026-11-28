@@ -12,6 +12,7 @@ import { Icon } from '../icons.jsx';
 import { confetti, buzz, motionOn } from '../lib/motion.js';
 import { eggsOn, secretWord } from '../lib/eggs.js';
 import { secret } from '../lib/trophies.js';
+import { byPlace, placeItem, moveTo } from '../lib/itemorder.js';
 
 const UNDO_MS = 5000;
 const LEAVE_MS = 280; // ticked rows slide away before they move to Bought
@@ -35,6 +36,9 @@ export function Shopping({ household, say, userId, memberships }) {
   const [edit, setEdit] = useState(null);
   const [note, setNote] = useState('');
   const [itemText, setItemText] = useState(''); // the item as typed, e.g. '2 L milk'
+  const [dragging, setDragging] = useState(null); // { id, section, index, y } while an item is being dragged
+  const dragRef = useRef(null);
+  const listsRef = useRef();
   const timers = useRef({});
   const [magic, setMagic] = useState(false); // 'abracadabra': the list shuffles and settles back
 
@@ -162,8 +166,73 @@ export function Shopping({ household, say, userId, memberships }) {
   // Where each item goes: the household's saved choice, then the built-in guess. The section stored on
   // the item is only used offline before saved choices have loaded.
   const sectionOf = (i) => memoryFor(i.name, sections)?.section || (sectionsLoaded ? guessSection(i.name) : i.category || guessSection(i.name));
-  const groups = orderedSections(aisleOrder).map((s) => ({ ...s, items: toBuy.filter((i) => sectionOf(i) === s.id) })).filter((g) => g.items.length);
+  const groups = orderedSections(aisleOrder).map((s) => ({ ...s, items: toBuy.filter((i) => sectionOf(i) === s.id).sort(byPlace) })).filter((g) => g.items.length);
+
+  // Drag an item by its grip: up or down to reorder, or into another section to move it there.
+  // A copy follows the finger and a line shows where it will go; the list only changes on release.
+  function startDrag(e, item) {
+    e.preventDefault();
+    const section = sectionOf(item);
+    const g = groups.find((x) => x.id === section);
+    const index = g.items.findIndex((x) => x.id === item.id);
+    dragRef.current = { item, from: section, to: { section, index }, y: e.clientY };
+    setDragging({ id: item.id, section, index, y: e.clientY });
+    buzz(10);
+    const onMove = (ev) => moveDrag(ev);
+    const onUp = (ev) => { cleanup(); endDrag(ev.type === 'pointerup'); };
+    const cleanup = () => { removeEventListener('pointermove', onMove); removeEventListener('pointerup', onUp); removeEventListener('pointercancel', onUp); };
+    addEventListener('pointermove', onMove);
+    addEventListener('pointerup', onUp);
+    addEventListener('pointercancel', onUp);
+  }
+  function moveDrag(e) {
+    const d = dragRef.current;
+    if (!d) return;
+    // Scroll when dragging near the top, or near the tab bar.
+    if (e.clientY > innerHeight - 150) scrollBy(0, 12);
+    else if (e.clientY < 90) scrollBy(0, -12);
+    const secs = [...listsRef.current.querySelectorAll('section[data-section]')];
+    let sec = secs[0];
+    for (const el of secs) if (el.getBoundingClientRect().top <= e.clientY) sec = el;
+    const rows = [...sec.querySelectorAll('li[data-id]')].filter((r) => r.dataset.id !== d.item.id);
+    const index = rows.filter((r) => { const b = r.getBoundingClientRect(); return b.top + b.height / 2 < e.clientY; }).length;
+    d.to = { section: sec.dataset.section, index };
+    setDragging({ id: d.item.id, section: d.to.section, index, y: e.clientY });
+  }
+  function endDrag(drop) {
+    const d = dragRef.current;
+    dragRef.current = null;
+    setDragging(null);
+    if (!d || !drop) return;
+    const { item, from, to } = d;
+    const target = groups.find((g) => g.id === to.section)?.items || [];
+    const ids = moveTo(target.map((x) => x.id), item.id, to.index);
+    const before = target.map((x) => x.id);
+    if (from === to.section && ids.join() === before.join()) return; // dropped where it was
+    const byId = Object.fromEntries([...target, item].map((x) => [x.id, x]));
+    const changes = placeItem(ids.map((id) => byId[id]), item.id);
+    if (from !== to.section) {
+      remember(item, { section: to.section });
+      const at = changes.find((c) => c.id === item.id);
+      if (at) at.category = to.section; else changes.push({ id: item.id, category: to.section });
+    }
+    for (const { id, ...fields } of changes) act({ type: 'update', id, fields }, (cur) => cur.map((x) => (x.id === id ? { ...x, ...fields } : x)));
+    buzz(12);
+    if (from !== to.section) say(`Moved to ${SECTION_LABEL[to.section]}`);
+  }
   const amount = (i) => formatAmount({ q: i.quantity == null ? null : Number(i.quantity), unit: i.unit });
+  // While dragging: a line in the target section showing where the item will land.
+  const withMark = (g) => {
+    if (!dragging || dragging.section !== g.id) return g.items;
+    const out = [];
+    let k = 0;
+    for (const i of g.items) {
+      if (i.id !== dragging.id && k++ === dragging.index) out.push(MARK);
+      out.push(i);
+    }
+    if (!out.includes(MARK)) out.push(MARK);
+    return out;
+  };
   const asText = (i) => `${amount(i)} ${i.name}`.trim();
   const from = (i) => (i.recipe_ids?.length ? i.recipe_ids.map((id) => titleOf[id]).filter(Boolean).join(', ') : 'Added by hand');
 
@@ -205,23 +274,28 @@ export function Shopping({ household, say, userId, memberships }) {
                 <p class="cap" style="margin:0;max-width:280px">Add things above, or use <strong>Build list</strong> on the Week screen to add what this week's meals need.</p>
               </div>
             )
-          ) : [<div class="row-head" style="gap:8px;flex-wrap:wrap"><p class="cap" style="margin:0;flex:1;min-width:180px">In the wrong part of the shop? Tap the item to move it.</p><button class="link" style="min-height:44px" onClick={() => setAisles(true)}>Aisle order</button></div>, ...groups.map((g) => (
-            <section class={magic ? 'magic' : ''}>
+          ) : <div ref={listsRef} style="display:flex;flex-direction:column;gap:inherit">{[<div class="row-head" style="gap:8px;flex-wrap:wrap"><p class="cap" style="margin:0;flex:1;min-width:180px">Drag the dots to reorder or move an item. Tap it to edit.</p><button class="link" style="min-height:44px" onClick={() => setAisles(true)}>Aisle order</button></div>, ...groups.map((g) => (
+            <section class={magic ? 'magic' : ''} data-section={g.id}>
               <h2 class="lbl">{g.label}</h2>
               <ul class="card shop">
-                {g.items.map((i) => (
-                  <li class={`${pending[i.id] ? 'done' : ''}${leaving[i.id] ? ' leaving' : ''}`}>
+                {withMark(g).map((i) => i === MARK ? <li class="drop-mark" aria-hidden="true" /> : (
+                  <li key={i.id} data-id={i.id} class={`${pending[i.id] ? 'done' : ''}${leaving[i.id] ? ' leaving' : ''}${dragging?.id === i.id ? ' lifted' : ''}`}>
                     <button class="tickbox" role="checkbox" aria-checked={pending[i.id] ? 'true' : 'false'} aria-label={i.name} onClick={() => tick(i)}>{pending[i.id] && <Icon name="check" size={18} stroke={3} />}</button>
                     <button class="shop-text" onClick={() => { setEdit(i); setNote(i.buy_note || ''); setItemText(asText(i)); }} aria-label={`${i.name}${i.organic ? ', organic' : ''}. Edit`}>
                       <span class="nm">{i.name}{i.organic && <span class="chip organic"><Icon name="leaf" size={12} stroke={2.4} />Organic</span>}</span>
                       <span class="cap">{i.buy_note ? <strong style="color:var(--ink)">{i.buy_note} · </strong> : null}{from(i)}</span>
                     </button>
                     <span class="qty">{amount(i)}</span>
+                    {!pending[i.id] && <span class="grip" aria-hidden="true" onPointerDown={(e) => startDrag(e, i)}><Icon name="grip" size={20} /></span>}
                   </li>
                 ))}
               </ul>
             </section>
-          ))]}
+          ))]}</div>}
+          {dragging && (() => {
+            const i = toBuy.find((x) => x.id === dragging.id);
+            return i ? <div class="drag-ghost" aria-hidden="true" style={`top:${dragging.y - 72}px`}><span class="nm">{i.name}</span><span class="qty">{amount(i)}</span></div> : null;
+          })()}
         </>
       ) : (
         <>
@@ -284,6 +358,8 @@ export function Shopping({ household, say, userId, memberships }) {
     </main>
   );
 }
+
+const MARK = {};
 
 // Keep anything typed after a comma or in brackets ('milk, light') as part of the name.
 function nameOf(p) {

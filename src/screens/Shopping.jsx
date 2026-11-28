@@ -72,7 +72,14 @@ export function Shopping({ household, say, userId, memberships }) {
     if (pending[item.id]) return undo(item);
     setPending((p) => ({ ...p, [item.id]: true }));
     setSnack({ item, at: Date.now() });
-    const last = toBuy.length > 0 && toBuy.every((i) => i.id === item.id || pending[i.id]);
+    // Celebrate when the Coles part of the list is done: 'Other' is usually things from elsewhere,
+    // so it doesn't count (unless that's all there is).
+    const done = (ticked) => {
+      const coles = toBuy.filter((i) => sectionOf(i) !== 'other');
+      const list = coles.length ? coles : toBuy;
+      return list.length > 0 && list.every((i) => ticked(i.id));
+    };
+    const last = !done((id) => pending[id]) && done((id) => id === item.id || pending[id]);
     if (last) { setCheer(true); confetti(); buzz([20, 60, 40]); secret('clean_sweep', say, 5600); } else buzz(10);
     timers.current[item.id] = setTimeout(() => {
       const archive = () => {
@@ -316,7 +323,7 @@ export function Shopping({ household, say, userId, memberships }) {
       {snack && (
         <div class="toast" role="status" style="display:flex;align-items:center;gap:10px;padding:6px 8px 6px 16px">
           <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="10" fill="none" stroke="var(--line)" stroke-width="3" /><circle class="ring" key={snack.at} cx="13" cy="13" r="10" fill="none" stroke="var(--beet)" stroke-width="3" stroke-dasharray="62.8" transform="rotate(-90 13 13)" stroke-linecap="round" /></svg>
-          <span style="flex:1">{cheer ? <strong>All done! </strong> : null}{snack.item.name} bought</span>
+          <span style="flex:1">{cheer ? <strong>{toBuy.some((i) => !pending[i.id]) ? 'All done at Coles! ' : 'All done! '}</strong> : null}{snack.item.name} bought</span>
           <button class="link" onClick={() => undo(snack.item)}>Undo</button>
         </div>
       )}

@@ -34,6 +34,7 @@ export function Shopping({ household, say, userId, memberships }) {
   const [snack, setSnack] = useState(null);
   const [edit, setEdit] = useState(null);
   const [note, setNote] = useState('');
+  const [itemText, setItemText] = useState(''); // the item as typed, e.g. '2 L milk'
   const timers = useRef({});
   const [magic, setMagic] = useState(false); // 'abracadabra': the list shuffles and settles back
 
@@ -110,12 +111,30 @@ export function Shopping({ household, say, userId, memberships }) {
     }
     const p = parseIngredient(text);
     if (!p) return;
-    const name = p.note && !p.quantity ? `${p.name}` : p.name;
+    const name = nameOf(p);
     const mem = memoryFor(name, sections);
     const row = { id: crypto.randomUUID(), household_id: household.id, name, quantity: p.quantity, unit: p.unit, category: sectionFor(name, sections), organic: !!mem?.organic, buy_note: mem?.buy_note || null, recipe_ids: [], created_by: userId, created_at: new Date().toISOString(), archived_at: null };
     setText('');
     setCheer(false);
     act({ type: 'add', row }, (cur) => [...cur, row]);
+  }
+
+  // Edit an item's amount and name, typed the same way as adding one.
+  const lastSave = useRef('');
+  function saveItem(item) {
+    const typed = itemText.trim();
+    if (!typed || typed === asText(item)) return;
+    if (lastSave.current === `${item.id}|${typed}`) return; // Save, then the box losing focus: once is enough
+    lastSave.current = `${item.id}|${typed}`;
+    const p = parseIngredient(typed);
+    if (!p || !p.name) { say("Couldn't read that. Try something like 2 L milk.", true); setItemText(asText(item)); return; }
+    const name = nameOf(p);
+    const fields = { name, quantity: p.quantity ?? null, unit: p.unit || null };
+    if (name.toLowerCase() !== item.name.toLowerCase()) fields.category = sectionFor(name, sections);
+    act({ type: 'update', id: item.id, fields }, (cur) => cur.map((x) => (x.id === item.id ? { ...x, ...fields } : x)));
+    setEdit((e) => (e && e.id === item.id ? { ...e, ...fields } : e));
+    setItemText(asText({ ...item, ...fields }));
+    say(`Changed to ${asText({ ...item, ...fields })}`);
   }
 
   // Remember the household's choice for this item (section, organic, note) for next time.
@@ -145,6 +164,7 @@ export function Shopping({ household, say, userId, memberships }) {
   const sectionOf = (i) => memoryFor(i.name, sections)?.section || (sectionsLoaded ? guessSection(i.name) : i.category || guessSection(i.name));
   const groups = orderedSections(aisleOrder).map((s) => ({ ...s, items: toBuy.filter((i) => sectionOf(i) === s.id) })).filter((g) => g.items.length);
   const amount = (i) => formatAmount({ q: i.quantity == null ? null : Number(i.quantity), unit: i.unit });
+  const asText = (i) => `${amount(i)} ${i.name}`.trim();
   const from = (i) => (i.recipe_ids?.length ? i.recipe_ids.map((id) => titleOf[id]).filter(Boolean).join(', ') : 'Added by hand');
 
   return (
@@ -192,7 +212,7 @@ export function Shopping({ household, say, userId, memberships }) {
                 {g.items.map((i) => (
                   <li class={`${pending[i.id] ? 'done' : ''}${leaving[i.id] ? ' leaving' : ''}`}>
                     <button class="tickbox" role="checkbox" aria-checked={pending[i.id] ? 'true' : 'false'} aria-label={i.name} onClick={() => tick(i)}>{pending[i.id] && <Icon name="check" size={18} stroke={3} />}</button>
-                    <button class="shop-text" onClick={() => { setEdit(i); setNote(i.buy_note || ''); }} aria-label={`${i.name}${i.organic ? ', organic' : ''}. Change section or preferences`}>
+                    <button class="shop-text" onClick={() => { setEdit(i); setNote(i.buy_note || ''); setItemText(asText(i)); }} aria-label={`${i.name}${i.organic ? ', organic' : ''}. Edit`}>
                       <span class="nm">{i.name}{i.organic && <span class="chip organic"><Icon name="leaf" size={12} stroke={2.4} />Organic</span>}</span>
                       <span class="cap">{i.buy_note ? <strong style="color:var(--ink)">{i.buy_note} · </strong> : null}{from(i)}</span>
                     </button>
@@ -229,9 +249,17 @@ export function Shopping({ household, say, userId, memberships }) {
 
       {edit && (
         <div class="scrim" onClick={(e) => e.target === e.currentTarget && setEdit(null)}>
-          <section class="sheet" role="dialog" aria-label={`Move ${edit.name}`}>
+          <section class="sheet" role="dialog" aria-label={`Edit ${edit.name}`}>
             <div class="handle" />
-            <div class="row-head"><h2 style="margin:0;font:600 22px/28px var(--display)">{edit.name}</h2><button class="icon-btn" style="margin-left:auto" aria-label="Close" onClick={() => setEdit(null)}><Icon name="close" /></button></div>
+            <div class="row-head"><h2 style="margin:0;font:600 22px/28px var(--display)">Edit item</h2><button class="icon-btn" style="margin-left:auto" aria-label="Close" onClick={() => setEdit(null)}><Icon name="close" /></button></div>
+            <form style="display:flex;gap:8px;align-items:flex-end" onSubmit={(e) => { e.preventDefault(); saveItem(edit); e.currentTarget.querySelector('input').blur(); }}>
+              <div style="flex:1">
+                <label class="lbl" for="it">Item</label>
+                <input id="it" class="field" value={itemText} placeholder="e.g. 2 L milk" enterkeyhint="done" onInput={(e) => setItemText(e.currentTarget.value)} onBlur={() => saveItem(edit)} />
+              </div>
+              {itemText.trim() !== asText(edit) && <button class="btn sm" style="height:48px" onPointerDown={(e) => e.preventDefault()}>Save</button>}
+            </form>
+            {edit.recipe_ids?.length ? <span class="cap" style="margin-top:-8px">For {from(edit)}</span> : null}
             <span class="lbl" style="margin:0">Which part of the shop?</span>
             <div class="chips">
               {SECTIONS.map((s) => (
@@ -255,6 +283,11 @@ export function Shopping({ household, say, userId, memberships }) {
       {aisles && <AisleOrder onClose={() => setAisles(false)} say={say} />}
     </main>
   );
+}
+
+// Keep anything typed after a comma or in brackets ('milk, light') as part of the name.
+function nameOf(p) {
+  return p.note ? `${p.name}, ${p.note}` : p.name;
 }
 
 export { SECTION_LABEL };

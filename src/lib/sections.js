@@ -111,6 +111,8 @@ export function guessSection(name) {
   const hit = (rules) => rules.some((re) => re.test(n));
   // Frozen beats everything ("frozen peas", "frozen chicken").
   if (/(^|[^a-z])frozen([^a-z]|$)/.test(n)) return 'frozen';
+  // Lactose-free or dairy-free milk, yoghurt and cheese sit with the dairy at Coles, not the dietary aisle.
+  if (/(lactose|dairy)[ -]free/.test(n) && /\b(milk|yogh?urt|cheese|cream|butter|custard)\b/.test(n) && !/\b(powder|long life|uht)\b/.test(n)) return 'fridge';
   for (const [section, rules] of PHRASE_RULES) if (hit(rules)) return section;
   if (hit(FORM_RULES) && !(hit(MEAT) && !/(stock|broth|sauce|bouillon|gravy|salt|seasoning|powder)/.test(n))) return 'pantry';
   for (const [section, rules] of WORD_RULES) if (hit(rules)) return section;

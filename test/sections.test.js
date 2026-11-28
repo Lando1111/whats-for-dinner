@@ -45,3 +45,11 @@ test("the household's own choice wins", () => {
   assert.equal(sectionFor('Garlic powder', { 'garlic powder': { section: 'other' } }), 'other');
   assert.equal(sectionFor('garlic powder', {}), 'pantry');
 });
+
+test('lactose-free dairy stays with the dairy', async () => {
+  const { guessSection } = await import('../src/lib/sections.js');
+  assert.equal(guessSection('light milk, lactose free'), 'fridge');
+  assert.equal(guessSection('lactose free yoghurt'), 'fridge');
+  assert.equal(guessSection('dairy-free cheese'), 'fridge');
+  assert.equal(guessSection('gluten free pasta'), 'world');
+});
